@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: Launlog API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /customers:
+    get:
+      operationId: listCustomers
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+    post:
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerDetail'
+  /services:
+    get:
+      operationId: listServices
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+  /service-categories:
+    get:
+      operationId: listServiceCategories
+      responses:
+        '200':
+          description: OK
+  /payment-methods:
+    get:
+      operationId: listPaymentMethods
+      responses:
+        '200':
+          description: OK
+  /transactions:
+    post:
+      operationId: createTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionInput'
+      responses:
+        '201':
+          description: Created
+    get:
+      operationId: listTransactions
+      parameters:
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: OK
+  /transactions/{id}/payments:
+    post:
+      operationId: addPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInput'
+      responses:
+        '200':
+          description: OK
+  /expenditures:
+    post:
+      operationId: createExpenditure
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenditureInput'
+      responses:
+        '201':
+          description: Created
+  /dashboard:
+    get:
+      operationId: getDashboard
+      responses:
+        '200':
+          description: OK
+  /reports/profit-loss:
+    get:
+      operationId: profitLossReport
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    CustomerInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        address: { type: string }
+    CustomerDetail:
+      allOf:
+        - $ref: '#/components/schemas/Customer'
+        - type: object
+          properties:
+            orders: { type: array }
+    Service:
+      type: object
+      properties:
+        id: { type: integer }
+        categoryId: { type: integer }
+        name: { type: string }
+        price: { type: number }
+        estimation: { type: string }
+        unit: { type: string }
+        description: { type: string }
+    TransactionInput:
+      type: object
+      required: [userId, items]
+      properties:
+        userId: { type: integer }
+        customerId: { type: integer }
+        isDelivery: { type: boolean }
+        notes: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              serviceId: { type: integer }
+              qty: { type: number }
+              notes: { type: string }
+    PaymentInput:
+      type: object
+      required: [paymentMethodId, amount, paymentType, userId]
+      properties:
+        paymentMethodId: { type: integer }
+        amount: { type: number }
+        paymentType: { type: string, enum: [dp, settlement] }
+        userId: { type: integer }
+        notes: { type: string }
+    ExpenditureInput:
+      type: object
+      required: [userId, totalAmount, itemName]
+      properties:
+        userId: { type: integer }
+        supplier: { type: string }
+        totalAmount: { type: number }
+        notes: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              itemName: { type: string }
+              qty: { type: number }
+              unitPrice: { type: number }
