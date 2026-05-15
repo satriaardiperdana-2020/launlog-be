@@ -1,6 +1,6 @@
 package: api
 output: internal/api/openapi.gen.go
 generate:
-  chi-server: true
+  echo-server: true
   models: true
   embedded-spec: true
