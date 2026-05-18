@@ -1,4 +1,4 @@
-package handlers
+/*package handlers
 
 import (
 	"fmt"
@@ -70,3 +70,4 @@ func (h *TransactionHandler) CreateTransaction(ctx echo.Context) error {
 }
 
 // Additional methods (listTransactions, addPayment, etc.) can be added similarly
+*/

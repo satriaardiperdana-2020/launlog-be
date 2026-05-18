@@ -4,10 +4,33 @@ info:
   version: 1.0.0
 servers:
   - url: /api/v1
+
+# Global security (akan berlaku untuk semua endpoint)
+security:
+  - BearerAuth: []
+
 paths:
+  # ==================== HEALTH CHECK (TANPA AUTH) ====================
+  /health:
+    get:
+      operationId: health
+      security: []  # No auth required
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  # ==================== AUTH (TANPA AUTH) ====================
   /auth/register:
     post:
       operationId: register
+      security: []  # No auth required
       requestBody:
         required: true
         content:
@@ -23,11 +46,21 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '400':
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Email already exists
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/login:
     post:
       operationId: login
+      security: []  # No auth required
       requestBody:
         required: true
         content:
@@ -43,9 +76,16 @@ paths:
                 $ref: '#/components/schemas/AuthResponse'
         '401':
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== CUSTOMERS (PERLU AUTH) ====================
   /customers:
     get:
       operationId: listCustomers
+      summary: Get all customers
       parameters:
         - name: search
           in: query
@@ -59,6 +99,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Customer'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       operationId: createCustomer
       requestBody:
@@ -74,9 +120,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Customer'
+        '401':
+          description: Unauthorized
+
   /customers/{id}:
     get:
-      operationId: getCustomer
+      operationId: getCustomerById
+      summary: Get customer by ID
       parameters:
         - name: id
           in: path
@@ -89,13 +139,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CustomerDetail'
-  /services:
-    get:
-      operationId: listServices
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: updateCustomer
       parameters:
-        - name: categoryId
-          in: query
-          schema: { type: integer }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Customer not found
+    delete:
+      operationId: softDeleteCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Soft deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Customer not found
+
+  # ==================== SERVICE CATEGORIES (PERLU AUTH) ====================
+  /service-categories:
+    get:
+      operationId: listServiceCategories
+      summary: Get all service categories
       responses:
         '200':
           description: OK
@@ -104,19 +209,243 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Service'
-  /service-categories:
+                  $ref: '#/components/schemas/ServiceCategory'
+        '401':
+          description: Unauthorized
+    post:
+      operationId: createServiceCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceCategoryInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceCategory'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  /service-categories/{id}:
     get:
-      operationId: listServiceCategories
+      operationId: getServiceCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceCategory'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+    put:
+      operationId: updateServiceCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceCategoryInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceCategory'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+    delete:
+      operationId: softDeleteServiceCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Soft deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+
+  # ==================== SERVICES (PERLU AUTH) ====================
+  /services:
+    get:
+      operationId: listServices
+      summary: Get all services, can filter by category
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: integer }
+          description: Filter by category ID
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Search by service name
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceWithCategory'
+        '401':
+          description: Unauthorized
+    post:
+      operationId: createService
+      summary: Create new service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceInput'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  /services/{id}:
+    get:
+      operationId: getService
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+    put:
+      operationId: updateService
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+    delete:
+      operationId: softDeleteService
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Soft deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Service'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+
+  /services/{id}/detail:
+    get:
+      operationId: getServiceDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetail'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+
+  # ==================== PAYMENT METHODS (PERLU AUTH) ====================
   /payment-methods:
     get:
       operationId: listPaymentMethods
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaymentMethod'
+        '401':
+          description: Unauthorized
+
+  # ==================== TRANSACTIONS (PERLU AUTH) ====================
   /transactions:
     post:
       operationId: createTransaction
@@ -129,6 +458,14 @@ paths:
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
     get:
       operationId: listTransactions
       parameters:
@@ -141,6 +478,15 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+        '401':
+          description: Unauthorized
+
   /transactions/{id}/payments:
     post:
       operationId: addPayment
@@ -158,6 +504,16 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  # ==================== EXPENDITURES (PERLU AUTH) ====================
   /expenditures:
     post:
       operationId: createExpenditure
@@ -170,12 +526,29 @@ paths:
       responses:
         '201':
           description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  # ==================== DASHBOARD & REPORTS (PERLU AUTH) ====================
   /dashboard:
     get:
       operationId: getDashboard
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+        '401':
+          description: Unauthorized
+
   /reports/profit-loss:
     get:
       operationId: profitLossReport
@@ -191,8 +564,22 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitLossReport'
+        '401':
+          description: Unauthorized
+
 components:
   schemas:
+    # ... (semua schemas tetap sama seperti yang Anda miliki) ...
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
     User:
       type: object
       properties:
@@ -200,24 +587,28 @@ components:
         email: { type: string }
         name: { type: string }
         created_at: { type: string, format: date-time }
+
     RegisterRequest:
       type: object
-      required: [ email, password, name ]
+      required: [email, password, name]
       properties:
         email: { type: string, format: email }
         password: { type: string, minLength: 6 }
         name: { type: string }
+
     LoginRequest:
       type: object
-      required: [ email, password ]
+      required: [email, password]
       properties:
         email: { type: string }
         password: { type: string }
+
     AuthResponse:
       type: object
       properties:
         token: { type: string }
         user: { $ref: '#/components/schemas/User' }
+
     Customer:
       type: object
       properties:
@@ -227,6 +618,7 @@ components:
         address: { type: string }
         isActive: { type: boolean }
         createdAt: { type: string, format: date-time }
+
     CustomerInput:
       type: object
       required: [name]
@@ -234,12 +626,34 @@ components:
         name: { type: string }
         phone: { type: string }
         address: { type: string }
+        is_active: { type: boolean }
+
     CustomerDetail:
       allOf:
         - $ref: '#/components/schemas/Customer'
         - type: object
           properties:
             orders: { type: array }
+
+    ServiceCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ServiceCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        sortOrder: { type: integer }
+
     Service:
       type: object
       properties:
@@ -248,8 +662,74 @@ components:
         name: { type: string }
         price: { type: number }
         estimation: { type: string }
+        minQuantity: { type: number }
         unit: { type: string }
         description: { type: string }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ServiceWithCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        categoryId: { type: integer }
+        categoryName: { type: string }
+        name: { type: string }
+        price: { type: number }
+        estimation: { type: string }
+        minQuantity: { type: number }
+        unit: { type: string }
+        description: { type: string }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ServiceDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        categoryId: { type: integer }
+        categoryName: { type: string }
+        name: { type: string }
+        price: { type: number }
+        estimation: { type: string }
+        minQuantity: { type: number }
+        unit: { type: string }
+        description: { type: string }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ServiceInput:
+      type: object
+      required: [categoryId, name, price, estimation]
+      properties:
+        categoryId: { type: integer }
+        name: { type: string }
+        price: { type: number }
+        estimation: { type: string }
+        minQuantity: { type: number, default: 1 }
+        unit: { type: string, default: "kg" }
+        description: { type: string }
+        sortOrder: { type: integer }
+
+    PaymentMethod:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        isActive: { type: boolean }
+
+    TransactionItem:
+      type: object
+      properties:
+        serviceId: { type: integer }
+        qty: { type: number }
+        notes: { type: string }
+
     TransactionInput:
       type: object
       required: [userId, items]
@@ -261,11 +741,22 @@ components:
         items:
           type: array
           items:
-            type: object
-            properties:
-              serviceId: { type: integer }
-              qty: { type: number }
-              notes: { type: string }
+            $ref: '#/components/schemas/TransactionItem'
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: integer }
+        invoiceNo: { type: string }
+        userId: { type: integer }
+        customerId: { type: integer }
+        paymentMethodId: { type: integer }
+        paymentStatus: { type: string }
+        totalAmount: { type: number }
+        paidAmount: { type: number }
+        notes: { type: string }
+        transactionDate: { type: string, format: date-time }
+
     PaymentInput:
       type: object
       required: [paymentMethodId, amount, paymentType, userId]
@@ -275,6 +766,14 @@ components:
         paymentType: { type: string, enum: [dp, settlement] }
         userId: { type: integer }
         notes: { type: string }
+
+    ExpenditureItem:
+      type: object
+      properties:
+        itemName: { type: string }
+        qty: { type: number }
+        unitPrice: { type: number }
+
     ExpenditureInput:
       type: object
       required: [userId, totalAmount, itemName]
@@ -286,8 +785,32 @@ components:
         items:
           type: array
           items:
+            $ref: '#/components/schemas/ExpenditureItem'
+
+    DashboardResponse:
+      type: object
+      properties:
+        todayIncome: { type: number }
+        todayExpense: { type: number }
+
+    ProfitLossReport:
+      type: object
+      properties:
+        totalIncome: { type: number }
+        totalExpense: { type: number }
+        profit: { type: number }
+        details:
+          type: array
+          items:
             type: object
             properties:
-              itemName: { type: string }
-              qty: { type: number }
-              unitPrice: { type: number }
+              date: { type: string, format: date }
+              income: { type: number }
+              expense: { type: number }
+
+  # ==================== SECURITY SCHEMES ====================
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

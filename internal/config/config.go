@@ -1,25 +1,39 @@
 package config
 
 import (
-	"gopkg.in/yaml.v3"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	DBURL      string `yaml:"database_url"`
-	ServerPort string `yaml:"server_port"`
-	JWTSecret  string `yaml:"jwt_secret"`
+	Server struct {
+		Port string `yaml:"port"`
+	} `yaml:"server"`
+	Database struct {
+		Host     string `yaml:"host"`
+		Port     string `yaml:"port"`
+		User     string `yaml:"user"`
+		Password string `yaml:"password"`
+		Name     string `yaml:"name"`
+	} `yaml:"database"`
+	JWT struct {
+		Secret string `yaml:"secret"`
+	} `yaml:"jwt"`
 }
 
-func Load() (*Config, error) {
-	data, err := os.ReadFile("config-development.yml")
+func Load(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	var cfg Config
-	err = yaml.Unmarshal(data, &cfg)
-	if err != nil {
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
+	}
+	// fallback port default
+	if cfg.Server.Port == "" {
+		cfg.Server.Port = "8080"
 	}
 	return &cfg, nil
 }

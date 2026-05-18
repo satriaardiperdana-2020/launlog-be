@@ -2,43 +2,87 @@ package main
 
 import (
 	"github.com/labstack/echo/v4"
-	echoMid "github.com/labstack/echo/v4/middleware"
-	"launlog-be/config"
-	"launlog-be/internal/api"
-	"launlog-be/middleware"
-	"launlog-be/repository"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/satriaardiperdana-2020/launlog-be/internal/api"
+	"github.com/satriaardiperdana-2020/launlog-be/internal/config"
+	"github.com/satriaardiperdana-2020/launlog-be/internal/handlers"
+	authMiddleware "github.com/satriaardiperdana-2020/launlog-be/internal/middleware"
+	"github.com/satriaardiperdana-2020/launlog-be/internal/repository/postgresql"
 	"log"
+	"net/http"
 )
 
 func main() {
-	cfg, err := config.Load()
+	// Load configuration from YAML file
+	cfg, err := config.Load("config-development.yml")
 	if err != nil {
-		log.Fatal("Failed load config:", err)
+		log.Fatal("Failed to load config:", err)
 	}
 
-	repo, err := repository.NewRepository(cfg.DBURL)
+	// Connect to PostgreSQL database
+	pool, err := postgresql.NewConnection(cfg)
 	if err != nil {
-		log.Fatal("DB connection failed:", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
-	defer repo.Close()
+	queries := postgresql.New(pool)
 
+	// Initialize all handlers
+	authHandler := &handlers.AuthHandler{
+		Queries:   queries,
+		JWTSecret: []byte(cfg.JWT.Secret),
+	}
+	customerHandler := &handlers.CustomerHandler{Queries: queries}
+	serviceHandler := &handlers.ServiceHandler{Queries: queries}
+	//txHandler := &handlers.TransactionHandler{Queries: queries}
+	// ... other handlers
+
+	// Combine handlers into a single server that implements the strict interface
+	server := &handlers.LaunlogServer{
+		Queries:         queries,
+		AuthHandler:     authHandler,
+		CustomerHandler: customerHandler,
+		ServiceHandler:  serviceHandler,
+		//Transaction: txHandler,
+	}
+
+	// Create Echo instance
 	e := echo.New()
-	e.Use(echoMid.Recover())
-	e.Use(echoMid.Logger())
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	// CORS configuration – allows frontend origin (adjust as needed)
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"http://localhost:5173", "http://10.222.136.79:8080"},
+		AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
 
-	server := api.NewLaunlogServer(repo, cfg.JWTSecret)
-
-	// Public endpoints (no auth)
-	e.POST("/api/v1/auth/register", server.Register)
-	e.POST("/api/v1/auth/login", server.Login)
-
-	// Protected endpoints group
+	// Group for API v1
 	apiGroup := e.Group("/api/v1")
-	apiGroup.Use(middleware.AuthMiddleware(cfg.JWTSecret))
-	api.RegisterHandlers(apiGroup, server)
+	apiGroup.Use(authMiddleware.JWTAuth([]byte(cfg.JWT.Secret), queries))
 
-	log.Printf("Server running on %s", cfg.ServerPort)
-	if err := e.Start(cfg.ServerPort); err != nil {
-		log.Fatal(err)
-	}
+	// ----- Conditional JWT middleware on the same group -----
+	// We apply a middleware that skips JWT for login/register
+	apiGroup.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			path := c.Request().URL.Path
+			// Allow registration and login without token
+			if path == "/api/v1/auth/register" || path == "/api/v1/auth/login" {
+				return next(c)
+			}
+			// All other endpoints under /api/v1 need a valid JWT
+			return authMiddleware.JWTAuth([]byte(cfg.JWT.Secret), queries)(next)(c)
+		}
+	})
+
+	// Strict handler (from generated code)
+	strictHandler := api.NewStrictHandler(server, nil)
+
+	// Register all routes (including auth endpoints)
+	api.RegisterHandlers(apiGroup, strictHandler)
+	apiGroup.POST("/auth/logout", authHandler.Logout)
+
+	// Start server
+	log.Fatal(e.Start(":" + cfg.Server.Port))
 }

@@ -21,3 +21,7 @@ sql:
           - db_type: "varchar"
             go_type: "string"
             nullable: false
+          - column: "users.name"
+            go_type: "string"
+          - column: "customers.name"
+            go_type: "string"
