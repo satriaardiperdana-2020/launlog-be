@@ -234,7 +234,7 @@ paths:
 
   /service-categories/{id}:
     get:
-      operationId: getServiceCategory
+      operationId: GetServiceCategoryById
       parameters:
         - name: id
           in: path
@@ -303,7 +303,7 @@ paths:
   /services:
     get:
       operationId: listServices
-      summary: Get all services, can filter by category
+      summary: Get all services with category name
       parameters:
         - name: categoryId
           in: query
@@ -324,6 +324,10 @@ paths:
                   $ref: '#/components/schemas/ServiceWithCategory'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       operationId: createService
       summary: Create new service
@@ -342,12 +346,20 @@ paths:
                 $ref: '#/components/schemas/Service'
         '400':
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /services/{id}:
     get:
-      operationId: getService
+      operationId: getServiceById
       parameters:
         - name: id
           in: path
@@ -376,7 +388,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ServiceInput'
+              $ref: '#/components/schemas/ServiceUpdate'
       responses:
         '200':
           description: Updated
@@ -406,8 +418,16 @@ paths:
                 $ref: '#/components/schemas/Service'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /services/{id}/detail:
     get:
@@ -709,7 +729,20 @@ components:
       properties:
         categoryId: { type: integer }
         name: { type: string }
-        price: { type: number }
+        price: { type: number, nullable: true }
+        estimation: { type: string }
+        minQuantity: { type: number, default: 1 }
+        unit: { type: string, default: "kg" }
+        description: { type: string }
+        sortOrder: { type: integer }
+
+    ServiceUpdate:
+      type: object
+      required: [ categoryId, name, price, estimation ]
+      properties:
+        categoryId: { type: integer }
+        name: { type: string }
+        price: { type: number, nullable: true }
         estimation: { type: string }
         minQuantity: { type: number, default: 1 }
         unit: { type: string, default: "kg" }

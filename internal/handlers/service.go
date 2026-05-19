@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
+	"github.com/labstack/gommon/log"
 	"github.com/satriaardiperdana-2020/launlog-be/internal/helper"
+	"math/big"
 	"net/http"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,10 +22,13 @@ type ServiceHandler struct {
 // ==================== SERVICE CATEGORIES ====================
 
 func (h *ServiceHandler) ListServiceCategories(ctx context.Context, req api.ListServiceCategoriesRequestObject) (api.ListServiceCategoriesResponseObject, error) {
+	log.Info("🔥🔥 ListServiceCategories HANDLER called") // <- tambah
 	categories, err := h.Queries.ListServiceCategories(ctx)
 	if err != nil {
+		log.Printf("ERROR ListServiceCategories: %v", err) // <- tambah
 		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+	log.Printf("Found %d categories", len(categories))
 	resp := make([]api.ServiceCategory, len(categories))
 	for i, cat := range categories {
 		desc := ""
@@ -35,11 +41,12 @@ func (h *ServiceHandler) ListServiceCategories(ctx context.Context, req api.List
 			Name:        &cat.Name,
 			Description: &desc,
 		}
+		log.Info(" res:  ", resp)
 	}
 	return api.ListServiceCategories200JSONResponse(resp), nil
 }
 
-func (h *ServiceHandler) GetServiceCategory(ctx context.Context, req api.GetServiceCategoryRequestObject) (api.GetServiceCategoryResponseObject, error) {
+func (h *ServiceHandler) GetServiceCategoryById(ctx context.Context, req api.GetServiceCategoryByIdRequestObject) (api.GetServiceCategoryByIdResponseObject, error) {
 	cat, err := h.Queries.GetServiceCategoryByID(ctx, int64(req.Id))
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusNotFound, "Category not found")
@@ -54,7 +61,7 @@ func (h *ServiceHandler) GetServiceCategory(ctx context.Context, req api.GetServ
 		Name:        &cat.Name,
 		Description: &desc,
 	}
-	return api.GetServiceCategory200JSONResponse(resp), nil
+	return api.GetServiceCategoryById200JSONResponse(resp), nil
 }
 
 func (h *ServiceHandler) CreateServiceCategory(ctx context.Context, req api.CreateServiceCategoryRequestObject) (api.CreateServiceCategoryResponseObject, error) {
@@ -140,16 +147,34 @@ func (h *ServiceHandler) SoftDeleteServiceCategory(ctx context.Context, req api.
 // ==================== SERVICES ====================
 
 func (h *ServiceHandler) ListServices(ctx context.Context, req api.ListServicesRequestObject) (api.ListServicesResponseObject, error) {
-	services, err := h.Queries.ListServices(ctx)
+	var categoryID sql.NullInt64
+	if req.Params.CategoryId != nil {
+		categoryID.Int64 = int64(*req.Params.CategoryId)
+		categoryID.Valid = true
+		log.Printf("Filtering by category ID: %d", categoryID.Int64)
+	} else {
+		log.Printf("No category filter applied")
+	}
+
+	var search sql.NullString
+	if req.Params.Search != nil && *req.Params.Search != "" {
+		search.String = *req.Params.Search
+		search.Valid = true
+		log.Printf("Searching for: %s", search.String)
+	} else {
+		log.Printf("No search filter applied")
+	}
+
+	services, err := h.Queries.ListServices(ctx, postgresql.ListServicesParams{
+		CategoryID: pgtype.Int8(categoryID),
+		Search:     pgtype.Text(search),
+	})
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	resp := make([]api.ServiceWithCategory, len(services))
 	for i, svc := range services {
-		desc := ""
-		if svc.Description.Valid {
-			desc = svc.Description.String
-		}
+		desc := svc.Description
 
 		//id := int(svc.ID)
 		//categoryId := int(svc.CategoryID)
@@ -171,15 +196,12 @@ func (h *ServiceHandler) ListServices(ctx context.Context, req api.ListServicesR
 	return api.ListServices200JSONResponse(resp), nil
 }
 
-func (h *ServiceHandler) GetService(ctx context.Context, req api.GetServiceRequestObject) (api.GetServiceResponseObject, error) {
-	svc, err := h.Queries.GetServiceByID(ctx, int64(req.Id))
+func (h *ServiceHandler) GetServiceById(ctx context.Context, req api.GetServiceByIdRequestObject) (api.GetServiceByIdResponseObject, error) {
+	svc, err := h.Queries.GetServiceById(ctx, int64(req.Id))
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusNotFound, "Service not found")
 	}
-	desc := ""
-	if svc.Description.Valid {
-		desc = svc.Description.String
-	}
+	desc := svc.Description
 	//id := int(svc.ID)
 	//categoryId := int(svc.CategoryID)
 	price := helper.NumericToFloat32(svc.Price)
@@ -196,7 +218,7 @@ func (h *ServiceHandler) GetService(ctx context.Context, req api.GetServiceReque
 		Description: &desc,
 		IsActive:    &svc.IsActive,
 	}
-	return api.GetService200JSONResponse(resp), nil
+	return api.GetServiceById200JSONResponse(resp), nil
 }
 
 func (h *ServiceHandler) GetServiceDetail(ctx context.Context, req api.GetServiceDetailRequestObject) (api.GetServiceDetailResponseObject, error) {
@@ -225,25 +247,53 @@ func (h *ServiceHandler) GetServiceDetail(ctx context.Context, req api.GetServic
 	return api.GetServiceDetail200JSONResponse(resp), nil
 }
 
-func (h *ServiceHandler) CreateService(ctx context.Context, req api.CreateServiceRequestObject) (api.CreateServiceResponseObject, error) {
+/*func (h *ServiceHandler) CreateService(ctx context.Context, req api.CreateServiceRequestObject) (api.CreateServiceResponseObject, error) {
 	desc := pgtype.Text{}
+	if req.Body.Price == nil {
+		msg := "Price is required"
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
+	if *req.Body.Price <= 0 {
+		msg := "Price must be greater than 0"
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
+
 	if req.Body.Description != nil {
 		desc.String = *req.Body.Description
 		desc.Valid = true
 	}
-	/*minQty := float64(1)
+	minQty := float64(1)
 	if req.Body.MinQuantity != nil {
 		minQty = float64(*req.Body.MinQuantity)
-	}*/
+	}
+	minQtyNumeric := pgtype.Numeric{}
+	if err := minQtyNumeric.Scan(minQty); err != nil {
+		msg := "Invalid min quantity format"
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
+	// Pastikan valid
+	minQtyNumeric.Valid = true
+
 	unit := "kg"
-	if req.Body.Unit != nil {
+	if req.Body.Unit != nil && *req.Body.Unit != "" {
 		unit = *req.Body.Unit
 	}
 
 	priceNumeric := pgtype.Numeric{}
-	priceNumeric.Scan(req.Body.Price)
-	minQtyNumeric := pgtype.Numeric{}
-	minQtyNumeric.Scan(req.Body.MinQuantity)
+	// Cara 1: Konversi ke float64 dulu, lalu Scan
+	priceFloat64 := float64(*req.Body.Price)
+	if err := priceNumeric.Scan(priceFloat64); err != nil {
+		// Cara 2: Jika Scan gagal, konversi manual
+		priceNumeric.Int = big.NewInt(int64(priceFloat64))
+		priceNumeric.Exp = 0
+		priceNumeric.Valid = true
+	}
+
+	// Pastikan Valid = true
+	if !priceNumeric.Valid {
+		msg := "Failed to convert price value"
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
 
 	svc, err := h.Queries.CreateService(ctx, postgresql.CreateServiceParams{
 		CategoryID:  int64(req.Body.CategoryId),
@@ -280,9 +330,119 @@ func (h *ServiceHandler) CreateService(ctx context.Context, req api.CreateServic
 	}
 	return api.CreateService201JSONResponse(resp), nil
 }
+*/
+
+func (h *ServiceHandler) CreateService(ctx context.Context, req api.CreateServiceRequestObject) (api.CreateServiceResponseObject, error) {
+	// ==================== VALIDASI PRICE ====================
+	if req.Body.Price == nil {
+		msg := "Price is required"
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
+	if *req.Body.Price <= 0 {
+		msg := "Price must be greater than 0"
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
+
+	// ==================== KONVERSI PRICE ====================
+	priceNumeric := pgtype.Numeric{}
+
+	// Cara manual yang lebih andal
+	priceValue := *req.Body.Price
+	priceInt := int64(priceValue)
+
+	// Set nilai ke pgtype.Numeric
+	priceNumeric.Int = big.NewInt(priceInt)
+	priceNumeric.Exp = 0
+	priceNumeric.Valid = true
+
+	// ==================== MIN_QUANTITY (WAJIB, DEFAULT 1) ====================
+	minQty := float64(1) // ← default 1
+	if req.Body.MinQuantity != nil {
+		minQty = float64(*req.Body.MinQuantity)
+	}
+	minQtyNumeric := pgtype.Numeric{}
+	minQtyInt := int64(minQty)
+	minQtyNumeric.Int = big.NewInt(minQtyInt)
+	minQtyNumeric.Exp = 0
+	minQtyNumeric.Valid = true
+
+	// ==================== UNIT (DEFAULT 'kg') ====================
+	unit := "kg"
+	if req.Body.Unit != nil && *req.Body.Unit != "" {
+		unit = *req.Body.Unit
+	}
+
+	// ==================== DESCRIPTION (OPTIONAL) ====================
+	desc := pgtype.Text{}
+	if req.Body.Description != nil {
+		desc.String = *req.Body.Description
+		desc.Valid = true
+	}
+
+	// ==================== SORT_ORDER (DEFAULT 0) ====================
+	/*	sortOrder := int32(0)
+		if req.Body.SortOrder != nil {
+			sortOrder = int32(*req.Body.SortOrder)
+		}*/
+
+	// ==================== INSERT DATABASE ====================
+	svc, err := h.Queries.CreateService(ctx, postgresql.CreateServiceParams{
+		CategoryID:  int64(req.Body.CategoryId),
+		Name:        req.Body.Name,
+		Price:       priceNumeric,
+		Estimation:  req.Body.Estimation,
+		MinQuantity: minQtyNumeric, // ← PASTIKAN VALID = true
+		Unit:        unit,
+		Description: desc,
+		//SortOrder:   sortOrder,
+	})
+	if err != nil {
+		msg := "Failed to create service: " + err.Error()
+		return api.CreateService400JSONResponse{Message: &msg}, nil
+	}
+
+	// ==================== RESPONSE ====================
+
+	priceResp := helper.NumericToFloat32(svc.Price)
+	minQtyResp := helper.NumericToFloat32(svc.MinQuantity)
+
+	descStr := ""
+	if svc.Description.Valid {
+		descStr = svc.Description.String
+	}
+
+	id := int(svc.ID)
+	categoryId := int(svc.CategoryID)
+
+	resp := api.Service{
+		Id:          &id,
+		CategoryId:  &categoryId,
+		Name:        &svc.Name,
+		Price:       &priceResp,
+		Estimation:  &svc.Estimation,
+		MinQuantity: &minQtyResp,
+		Unit:        &svc.Unit,
+		Description: &descStr,
+		IsActive:    &svc.IsActive,
+		//SortOrder:   &svc.SortOrder,
+		CreatedAt: &svc.CreatedAt,
+		UpdatedAt: &svc.UpdatedAt,
+	}
+	return api.CreateService201JSONResponse(resp), nil
+}
+
+// Helper function untuk konversi pgtype.Numeric ke float32
+/*func numericToFloat32(n pgtype.Numeric) float32 {
+	if !n.Valid {
+		return 0
+	}
+	f, _ := n.Float64Value()
+	return float32(f)
+}*/
 
 func (h *ServiceHandler) UpdateService(ctx context.Context, req api.UpdateServiceRequestObject) (api.UpdateServiceResponseObject, error) {
 	desc := pgtype.Text{}
+
 	if req.Body.Description != nil {
 		desc.String = *req.Body.Description
 		desc.Valid = true
@@ -297,7 +457,7 @@ func (h *ServiceHandler) UpdateService(ctx context.Context, req api.UpdateServic
 	}
 
 	// ✅ Gunakan helper Float64ToNumeric
-	priceNumeric := helper.Float32ToNumeric(req.Body.Price)
+	priceNumeric := helper.Float32ToNumeric(*req.Body.Price)
 	minQtyNumeric := helper.Float32ToNumeric(float32(minQty))
 	svc, err := h.Queries.UpdateService(ctx, postgresql.UpdateServiceParams{
 		ID:          int64(req.Id),
@@ -336,26 +496,30 @@ func (h *ServiceHandler) UpdateService(ctx context.Context, req api.UpdateServic
 	return api.UpdateService200JSONResponse(resp), nil
 }
 
-// SoftDeleteService implements strict server interface
+// SoftDeleteService soft deletes a service (sets is_active = false)
 func (h *ServiceHandler) SoftDeleteService(ctx context.Context, req api.SoftDeleteServiceRequestObject) (api.SoftDeleteServiceResponseObject, error) {
-	// Panggil query soft delete
+	log.Printf("🔵 SoftDeleteService called for ID: %d", req.Id)
+
+	// Call database query
 	svc, err := h.Queries.SoftDeleteService(ctx, int64(req.Id))
 	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusNotFound, "Service not found or already deleted")
+		log.Printf("❌ Soft delete error: %v", err)
+		msg := "Service not found or already deleted"
+		return api.SoftDeleteService404JSONResponse{Message: &msg}, nil
 	}
 
-	// Konversi data untuk response
-	desc := ""
-	if svc.Description.Valid {
-		desc = svc.Description.String
-	}
+	log.Printf("✅ Service %d soft deleted successfully", req.Id)
 
-	// Konversi pgtype.Numeric ke float32
+	// Convert response
 	price := helper.NumericToFloat32(svc.Price)
 	minQty := helper.NumericToFloat32(svc.MinQuantity)
-
 	id := int(svc.ID)
 	categoryId := int(svc.CategoryID)
+	sortOrder := int(svc.SortOrder)
+	descStr := ""
+	if svc.Description.Valid {
+		descStr = svc.Description.String
+	}
 
 	resp := api.Service{
 		Id:          &id,
@@ -365,11 +529,11 @@ func (h *ServiceHandler) SoftDeleteService(ctx context.Context, req api.SoftDele
 		Estimation:  &svc.Estimation,
 		MinQuantity: &minQty,
 		Unit:        &svc.Unit,
-		Description: &desc,
+		Description: &descStr,
 		IsActive:    &svc.IsActive,
-		//SortOrder:   &svc.SortOrder,
-		CreatedAt: &svc.CreatedAt,
-		UpdatedAt: &svc.UpdatedAt,
+		SortOrder:   &sortOrder,
+		CreatedAt:   &svc.CreatedAt,
+		UpdatedAt:   &svc.UpdatedAt,
 	}
 
 	return api.SoftDeleteService200JSONResponse(resp), nil

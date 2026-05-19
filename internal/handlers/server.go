@@ -77,22 +77,25 @@ func (s *LaunlogServer) CreateExpenditure(ctx context.Context, req api.CreateExp
 // ---------- Services ----------
 func (s *LaunlogServer) ListServices(ctx context.Context, req api.ListServicesRequestObject) (api.ListServicesResponseObject, error) {
 	// Stub: return empty list (200)
-	return s.ListServices(ctx, req)
+	return s.ServiceHandler.ListServices(ctx, req)
 }
 func (s *LaunlogServer) CreateService(ctx context.Context, req api.CreateServiceRequestObject) (api.CreateServiceResponseObject, error) {
-	return s.CreateService(ctx, req)
+	return s.ServiceHandler.CreateService(ctx, req)
 }
 
 func (s *LaunlogServer) UpdateService(ctx context.Context, req api.UpdateServiceRequestObject) (api.UpdateServiceResponseObject, error) {
-	return s.UpdateService(ctx, req)
+	return s.ServiceHandler.UpdateService(ctx, req)
 }
 
-func (s *LaunlogServer) GetService(ctx context.Context, req api.GetServiceRequestObject) (api.GetServiceResponseObject, error) {
-	return s.GetService(ctx, req)
+func (s *LaunlogServer) GetServiceById(ctx context.Context, req api.GetServiceByIdRequestObject) (api.GetServiceByIdResponseObject, error) {
+	return s.ServiceHandler.GetServiceById(ctx, req)
 }
 
 func (s *LaunlogServer) GetServiceDetail(ctx context.Context, req api.GetServiceDetailRequestObject) (api.GetServiceDetailResponseObject, error) {
-	return s.GetServiceDetail(ctx, req)
+	return s.ServiceHandler.GetServiceDetail(ctx, req)
+}
+func (s *LaunlogServer) SoftDeleteService(ctx context.Context, req api.SoftDeleteServiceRequestObject) (api.SoftDeleteServiceResponseObject, error) {
+	return s.ServiceHandler.SoftDeleteService(ctx, req)
 }
 
 // ==================== SERVICE CATEGORIES ====================
@@ -101,23 +104,20 @@ func (s *LaunlogServer) CreateServiceCategory(ctx context.Context, req api.Creat
 }
 
 func (s *LaunlogServer) UpdateServiceCategory(ctx context.Context, req api.UpdateServiceCategoryRequestObject) (api.UpdateServiceCategoryResponseObject, error) {
-	return s.UpdateServiceCategory(ctx, req)
+	return s.ServiceHandler.UpdateServiceCategory(ctx, req)
 }
 
 func (s *LaunlogServer) ListServiceCategories(ctx context.Context, req api.ListServiceCategoriesRequestObject) (api.ListServiceCategoriesResponseObject, error) {
-	// Stub: return empty list (200)
-	return api.ListServiceCategories200JSONResponse([]api.ServiceCategory{}), nil
+	return s.ServiceHandler.ListServiceCategories(ctx, req)
 }
-func (s *LaunlogServer) GetServiceCategory(ctx context.Context, req api.GetServiceCategoryRequestObject) (api.GetServiceCategoryResponseObject, error) {
-	return s.GetServiceCategory(ctx, req)
+func (s *LaunlogServer) GetServiceCategoryById(ctx context.Context, req api.GetServiceCategoryByIdRequestObject) (api.GetServiceCategoryByIdResponseObject, error) {
+	return s.ServiceHandler.GetServiceCategoryById(ctx, req)
 }
 
 func (s *LaunlogServer) SoftDeleteServiceCategory(ctx context.Context, req api.SoftDeleteServiceCategoryRequestObject) (api.SoftDeleteServiceCategoryResponseObject, error) {
-	return s.SoftDeleteServiceCategory(ctx, req)
+	return s.ServiceHandler.SoftDeleteServiceCategory(ctx, req)
 }
-func (s *LaunlogServer) SoftDeleteService(ctx context.Context, req api.SoftDeleteServiceRequestObject) (api.SoftDeleteServiceResponseObject, error) {
-	return s.SoftDeleteService(ctx, req)
-}
+
 func (s *LaunlogServer) ListPaymentMethods(ctx context.Context, req api.ListPaymentMethodsRequestObject) (api.ListPaymentMethodsResponseObject, error) {
 	// Stub: return empty list (200)
 	return api.ListPaymentMethods200JSONResponse([]api.PaymentMethod{}), nil

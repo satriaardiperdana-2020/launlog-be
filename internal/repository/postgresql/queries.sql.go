@@ -261,31 +261,48 @@ func (q *Queries) GetCustomerById(ctx context.Context, id int64) (Customer, erro
 	return i, err
 }
 
-const getServiceByID = `-- name: GetServiceByID :one
+const getServiceById = `-- name: GetServiceById :one
 SELECT
-    s.id, sc.name as category_name, s.name as service_name, s.price, s.estimation, s.min_quantity, s.unit, s.description, s.is_active
+    s.id,
+    s.category_id,
+    sc.name as category_name,
+    s.name as service_name,
+    s.price,
+    s.estimation,
+    s.min_quantity,
+    s.unit,
+    COALESCE(s.description, '') as description,
+    s.is_active,
+    s.sort_order,
+    s.created_at,
+    s.updated_at
 FROM services s
          JOIN service_categories sc ON s.category_id = sc.id
-WHERE  s.id = $1 AND s.is_active = true
+WHERE s.id = $1 AND s.is_active = true
 `
 
-type GetServiceByIDRow struct {
+type GetServiceByIdRow struct {
 	ID           int64          `json:"id"`
+	CategoryID   int64          `json:"category_id"`
 	CategoryName string         `json:"category_name"`
 	ServiceName  string         `json:"service_name"`
 	Price        pgtype.Numeric `json:"price"`
 	Estimation   string         `json:"estimation"`
 	MinQuantity  pgtype.Numeric `json:"min_quantity"`
 	Unit         string         `json:"unit"`
-	Description  pgtype.Text    `json:"description"`
+	Description  string         `json:"description"`
 	IsActive     bool           `json:"is_active"`
+	SortOrder    int32          `json:"sort_order"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
-func (q *Queries) GetServiceByID(ctx context.Context, id int64) (GetServiceByIDRow, error) {
-	row := q.db.QueryRow(ctx, getServiceByID, id)
-	var i GetServiceByIDRow
+func (q *Queries) GetServiceById(ctx context.Context, id int64) (GetServiceByIdRow, error) {
+	row := q.db.QueryRow(ctx, getServiceById, id)
+	var i GetServiceByIdRow
 	err := row.Scan(
 		&i.ID,
+		&i.CategoryID,
 		&i.CategoryName,
 		&i.ServiceName,
 		&i.Price,
@@ -294,6 +311,9 @@ func (q *Queries) GetServiceByID(ctx context.Context, id int64) (GetServiceByIDR
 		&i.Unit,
 		&i.Description,
 		&i.IsActive,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -541,27 +561,50 @@ func (q *Queries) ListServiceCategories(ctx context.Context) ([]ListServiceCateg
 
 const listServices = `-- name: ListServices :many
 SELECT
-    s.id, sc.name as category_name, s.name as service_name, s.price, s.estimation, s.min_quantity, s.unit, s.description, s.is_active
+    s.id,
+    s.category_id,
+    sc.name as category_name,
+    s.name as service_name,
+    s.price,
+    s.estimation,
+    s.min_quantity,
+    s.unit,
+    COALESCE(s.description, '') as description,
+    s.is_active,
+    s.sort_order,
+    s.created_at,
+    s.updated_at
 FROM services s
          JOIN service_categories sc ON s.category_id = sc.id
 WHERE s.is_active = true
+  AND ($1::bigint IS NULL OR s.category_id = $1::bigint)
+  AND ($2::text IS NULL OR s.name ILIKE '%' || $2::text || '%')
 ORDER BY s.sort_order, s.name
 `
 
+type ListServicesParams struct {
+	CategoryID pgtype.Int8 `json:"category_id"`
+	Search     pgtype.Text `json:"search"`
+}
+
 type ListServicesRow struct {
 	ID           int64          `json:"id"`
+	CategoryID   int64          `json:"category_id"`
 	CategoryName string         `json:"category_name"`
 	ServiceName  string         `json:"service_name"`
 	Price        pgtype.Numeric `json:"price"`
 	Estimation   string         `json:"estimation"`
 	MinQuantity  pgtype.Numeric `json:"min_quantity"`
 	Unit         string         `json:"unit"`
-	Description  pgtype.Text    `json:"description"`
+	Description  string         `json:"description"`
 	IsActive     bool           `json:"is_active"`
+	SortOrder    int32          `json:"sort_order"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
-func (q *Queries) ListServices(ctx context.Context) ([]ListServicesRow, error) {
-	rows, err := q.db.Query(ctx, listServices)
+func (q *Queries) ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error) {
+	rows, err := q.db.Query(ctx, listServices, arg.CategoryID, arg.Search)
 	if err != nil {
 		return nil, err
 	}
@@ -571,6 +614,7 @@ func (q *Queries) ListServices(ctx context.Context) ([]ListServicesRow, error) {
 		var i ListServicesRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.CategoryID,
 			&i.CategoryName,
 			&i.ServiceName,
 			&i.Price,
@@ -579,6 +623,9 @@ func (q *Queries) ListServices(ctx context.Context) ([]ListServicesRow, error) {
 			&i.Unit,
 			&i.Description,
 			&i.IsActive,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -705,15 +752,21 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 
 const updateService = `-- name: UpdateService :one
 UPDATE services
-SET category_id = $2, name = $3, price = $4, estimation = $5,
-    min_quantity = $6, unit = $7, description = $8,
+SET
+    category_id = $1::bigint,
+    name = $2::text,
+    price = $3::numeric,
+    estimation = $4::text,
+    min_quantity = $5::numeric,
+    unit = $6::text,
+    description = COALESCE($7::text, description),
+    sort_order = $8::int,
     updated_at = NOW()
-WHERE id = $1
+WHERE id = $9
     RETURNING id, category_id, name, price, estimation, min_quantity, unit, description, is_active, sort_order, created_at, updated_at
 `
 
 type UpdateServiceParams struct {
-	ID          int64          `json:"id"`
 	CategoryID  int64          `json:"category_id"`
 	Name        string         `json:"name"`
 	Price       pgtype.Numeric `json:"price"`
@@ -721,11 +774,12 @@ type UpdateServiceParams struct {
 	MinQuantity pgtype.Numeric `json:"min_quantity"`
 	Unit        string         `json:"unit"`
 	Description pgtype.Text    `json:"description"`
+	SortOrder   int32          `json:"sort_order"`
+	ID          int64          `json:"id"`
 }
 
 func (q *Queries) UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error) {
 	row := q.db.QueryRow(ctx, updateService,
-		arg.ID,
 		arg.CategoryID,
 		arg.Name,
 		arg.Price,
@@ -733,6 +787,8 @@ func (q *Queries) UpdateService(ctx context.Context, arg UpdateServiceParams) (S
 		arg.MinQuantity,
 		arg.Unit,
 		arg.Description,
+		arg.SortOrder,
+		arg.ID,
 	)
 	var i Service
 	err := row.Scan(

@@ -102,18 +102,44 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)
 
 -- name: ListServices :many
 SELECT
-    s.id, sc.name as category_name, s.name as service_name, s.price, s.estimation, s.min_quantity, s.unit, s.description, s.is_active
+    s.id,
+    s.category_id,
+    sc.name as category_name,
+    s.name as service_name,
+    s.price,
+    s.estimation,
+    s.min_quantity,
+    s.unit,
+    COALESCE(s.description, '') as description,
+    s.is_active,
+    s.sort_order,
+    s.created_at,
+    s.updated_at
 FROM services s
          JOIN service_categories sc ON s.category_id = sc.id
 WHERE s.is_active = true
+  AND (sqlc.narg('category_id')::bigint IS NULL OR s.category_id = sqlc.narg('category_id')::bigint)
+  AND (sqlc.narg('search')::text IS NULL OR s.name ILIKE '%' || sqlc.narg('search')::text || '%')
 ORDER BY s.sort_order, s.name;
 
--- name: GetServiceByID :one
+-- name: GetServiceById :one
 SELECT
-    s.id, sc.name as category_name, s.name as service_name, s.price, s.estimation, s.min_quantity, s.unit, s.description, s.is_active
+    s.id,
+    s.category_id,
+    sc.name as category_name,
+    s.name as service_name,
+    s.price,
+    s.estimation,
+    s.min_quantity,
+    s.unit,
+    COALESCE(s.description, '') as description,
+    s.is_active,
+    s.sort_order,
+    s.created_at,
+    s.updated_at
 FROM services s
          JOIN service_categories sc ON s.category_id = sc.id
-WHERE  s.id = $1 AND s.is_active = true;
+WHERE s.id = $1 AND s.is_active = true;
 
 -- name: GetServiceDetail :one
 SELECT
@@ -135,10 +161,17 @@ WHERE s.id = $1;
 
 -- name: UpdateService :one
 UPDATE services
-SET category_id = $2, name = $3, price = $4, estimation = $5,
-    min_quantity = $6, unit = $7, description = $8,
+SET
+    category_id = sqlc.arg('category_id')::bigint,
+    name = sqlc.arg('name')::text,
+    price = sqlc.arg('price')::numeric,
+    estimation = sqlc.arg('estimation')::text,
+    min_quantity = sqlc.arg('min_quantity')::numeric,
+    unit = sqlc.arg('unit')::text,
+    description = COALESCE(sqlc.narg('description')::text, description),
+    sort_order = sqlc.arg('sort_order')::int,
     updated_at = NOW()
-WHERE id = $1
+WHERE id = sqlc.arg('id')
     RETURNING *;
 
 -- name: SoftDeleteService :one

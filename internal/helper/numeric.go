@@ -1,6 +1,9 @@
 package helper
 
-import "github.com/jackc/pgx/v5/pgtype"
+import (
+	"database/sql"
+	"github.com/jackc/pgx/v5/pgtype"
+)
 
 func NumericToFloat64(n pgtype.Numeric) float64 {
 	if !n.Valid {
@@ -51,4 +54,12 @@ func Float64ToNumeric(f float64) pgtype.Numeric {
 		n.Valid = false
 	}
 	return n
+}
+
+// Helper function untuk konversi
+func nullInt64ToInt64(n sql.NullInt64, defaultValue int64) int64 {
+	if n.Valid {
+		return n.Int64
+	}
+	return defaultValue
 }

@@ -23,7 +23,7 @@ type Querier interface {
 	// ==================== AUTH & USERS ====================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	GetCustomerById(ctx context.Context, id int64) (Customer, error)
-	GetServiceByID(ctx context.Context, id int64) (GetServiceByIDRow, error)
+	GetServiceById(ctx context.Context, id int64) (GetServiceByIdRow, error)
 	GetServiceCategoryByID(ctx context.Context, id int64) (GetServiceCategoryByIDRow, error)
 	GetServiceDetail(ctx context.Context, id int64) (GetServiceDetailRow, error)
 	GetTodayIncomeExpense(ctx context.Context) (GetTodayIncomeExpenseRow, error)
@@ -32,7 +32,7 @@ type Querier interface {
 	IsTokenBlacklisted(ctx context.Context, jti string) (bool, error)
 	ListCustomers(ctx context.Context, dollar_1 string) ([]Customer, error)
 	ListServiceCategories(ctx context.Context) ([]ListServiceCategoriesRow, error)
-	ListServices(ctx context.Context) ([]ListServicesRow, error)
+	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
 	SoftDeleteCustomer(ctx context.Context, id int64) (Customer, error)
 	SoftDeleteService(ctx context.Context, id int64) (Service, error)
 	SoftDeleteServiceCategory(ctx context.Context, id int64) (ServiceCategory, error)
