@@ -113,77 +113,117 @@ CREATE TABLE payment_methods (
 -- ========================
 -- TRANSACTIONS
 -- ========================
+-- ==================== TRANSACTIONS TABLE ====================
+-- Menyimpan semua transaksi (income/pemasukan dan expenditure/pengeluaran)
+
 CREATE TABLE transactions (
-    id                BIGSERIAL     PRIMARY KEY,
-    invoice_no        VARCHAR(50)   NOT NULL UNIQUE,
-    type              VARCHAR(20)   NOT NULL DEFAULT 'income'
-    CHECK (type IN ('income', 'expenditure')),
-    user_id           BIGINT        NOT NULL REFERENCES users(id),
-    customer_id       BIGINT        REFERENCES customers(id),
-    payment_method_id BIGINT        REFERENCES payment_methods(id),
-    payment_status    VARCHAR(20)   NOT NULL DEFAULT 'unpaid'
-    CHECK (payment_status IN ('unpaid', 'dp', 'paid')),
-    is_delivery       BOOLEAN       NOT NULL DEFAULT false,
-    paid_amount       NUMERIC(12,2) NOT NULL DEFAULT 0,
-    supplier          VARCHAR(150),
-    total_amount      NUMERIC(12,2) NOT NULL DEFAULT 0,
-    notes             TEXT,
-    transaction_date  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    updated_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+    -- Primary Key
+                              id BIGSERIAL PRIMARY KEY,
+    -- Identifikasi Transaksi
+                              invoice_no VARCHAR(50) NOT NULL UNIQUE,
+                              transaction_type VARCHAR(20) DEFAULT 'income' NOT NULL , -- 'income' atau 'expense'
+    -- Relasi ke User (kasir/admin)
+                              user_id BIGINT NOT NULL REFERENCES users(id),
+    -- Untuk Income (transaksi dengan pelanggan)
+                              customer_id BIGINT NULL REFERENCES customers(id),
+                              payment_method_id BIGINT NULL REFERENCES payment_methods(id),
+                              payment_status VARCHAR(20) NOT NULL DEFAULT 'unpaid', -- 'unpaid', 'dp', 'paid'
+                              is_delivery BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Untuk expense (pengeluaran)
+                              supplier VARCHAR(150) NULL,
+                              expense_category VARCHAR(50) NULL,
+    -- Nilai Transaksi
+                              total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+                              paid_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+    -- Catatan
+                              notes TEXT NULL,
+    -- Timestamp
+                              transaction_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Constraints
+                              CONSTRAINT transactions_type_check CHECK (transaction_type IN ('income', 'expenditure')),
+                              CONSTRAINT transactions_payment_status_check CHECK (payment_status IN ('unpaid', 'dp', 'paid'))
 );
+
+-- ==================== INDEX (Opsional, untuk performa) ====================
+CREATE INDEX idx_transactions_type ON transactions(transaction_type);
+CREATE INDEX idx_transactions_date ON transactions(transaction_date);
+CREATE INDEX idx_transactions_customer ON transactions(customer_id);
+CREATE INDEX idx_transactions_user ON transactions(user_id);
+
 
 -- ========================
 -- TRANSACTION_ITEMS
 -- ========================
-CREATE TABLE transaction_items (
-    id             BIGSERIAL     PRIMARY KEY,
-    transaction_id BIGINT        NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    service_id     BIGINT        REFERENCES services(id),
-    item_name      VARCHAR(255),
-    qty            NUMERIC(10,2) NOT NULL DEFAULT 1,
-    unit           VARCHAR(20),
-    unit_price     NUMERIC(12,2) NOT NULL DEFAULT 0,
-    subtotal       NUMERIC(12,2) GENERATED ALWAYS AS (qty * unit_price) STORED,
-    notes          TEXT
+CREATE TABLE public.transaction_items (
+                                          id BIGSERIAL NOT NULL,
+                                          transaction_id BIGINT NOT NULL,
+                                          service_id BIGINT NULL,
+                                          item_name varchar(255) NULL,
+                                          qty numeric(10, 2) DEFAULT 1 NOT NULL,
+                                          unit varchar(20) NULL,
+                                          unit_price numeric(12, 2) DEFAULT 0 NOT NULL,
+                                          subtotal numeric(12, 2) GENERATED ALWAYS AS ((qty * unit_price)) STORED NULL,
+                                          notes text NULL,
+                                          CONSTRAINT transaction_items_pkey PRIMARY KEY (id),
+                                          CONSTRAINT transaction_items_service_id_fkey foreign key (service_id) references services(id),
+                                          CONSTRAINT transaction_items_transaction_id_fkey foreign key (transaction_id) references transactions(id)
+                                              on  delete cascade
 );
-
 -- ========================
 -- TRANSACTION_PAYMENTS
 -- ========================
-CREATE TABLE transaction_payments (
-    id                BIGSERIAL     PRIMARY KEY,
-    transaction_id    BIGINT        NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    payment_method_id BIGINT        NOT NULL REFERENCES payment_methods(id),
-    amount            NUMERIC(12,2) NOT NULL CHECK (amount > 0),
-    payment_type      VARCHAR(20)   NOT NULL DEFAULT 'dp'
-    CHECK (payment_type IN ('dp', 'settlement')),
-    paid_at           TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    received_by       BIGINT        NOT NULL REFERENCES users(id),
-    notes             TEXT,
-    created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+CREATE TABLE public.transaction_payments (
+                                             id bigserial NOT NULL,
+                                             transaction_id BIGINT NOT NULL,
+                                             payment_method_id BIGINT NOT NULL,
+                                             amount numeric(12, 2) NOT NULL,
+                                             payment_type varchar(20) DEFAULT 'dp' NOT NULL,
+                                             paid_at timestamptz DEFAULT now() NOT NULL,
+                                             received_by BIGINT NOT NULL,
+                                             notes text NULL,
+                                             created_at timestamptz DEFAULT now() NOT NULL,
+                                             CONSTRAINT transaction_payments_amount_check CHECK ((amount > (0))),
+                                             CONSTRAINT transaction_payments_payment_type_check CHECK (((payment_type) = ANY ((ARRAY['dp', 'settlement'])))),
+                                             CONSTRAINT transaction_payments_pkey PRIMARY KEY (id)
 );
-
 -- ========================
 -- TRANSACTION_DELIVERIES
 -- ========================
-CREATE TABLE transaction_deliveries (
-    id             BIGSERIAL     PRIMARY KEY,
-    transaction_id BIGINT        NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    type           VARCHAR(20)   NOT NULL CHECK (type IN ('pickup', 'dropoff')),
-    status         VARCHAR(30)   NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending','scheduled','on_the_way','done','cancelled')),
-    address        TEXT          NOT NULL,
-    scheduled_at   TIMESTAMPTZ,
-    completed_at   TIMESTAMPTZ,
-    courier_name   VARCHAR(100),
-    delivery_fee   NUMERIC(12,2) NOT NULL DEFAULT 0,
-    notes          TEXT,
-    created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    UNIQUE (transaction_id, type)
+CREATE TABLE public.transaction_deliveries (
+                                               id              BIGSERIAL       NOT NULL,
+                                               transaction_id  BIGINT          NOT NULL,
+                                               td_type         VARCHAR(20)     NOT NULL DEFAULT 'income',
+                                               status          VARCHAR(30)     NOT NULL DEFAULT 'pending',
+                                               address         TEXT            NOT NULL,
+                                               scheduled_at    TIMESTAMPTZ     NULL,
+                                               completed_at    TIMESTAMPTZ     NULL,
+                                               courier_name    VARCHAR(100)    NULL,
+                                               delivery_fee    NUMERIC(12, 2)  NOT NULL DEFAULT 0,
+                                               notes           TEXT            NULL,
+                                               created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+                                               updated_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    -- Primary Key
+                                               CONSTRAINT transaction_deliveries_pkey
+                                                   PRIMARY KEY (id),
+    -- Unique
+                                               CONSTRAINT transaction_deliveries_transaction_id_type_key
+                                                   UNIQUE (transaction_id, td_type),
+    -- Check: td_type
+                                               CONSTRAINT transaction_deliveries_type_check
+                                                   CHECK (td_type = ANY (ARRAY['pickup', 'dropoff'])),
+    -- Check: status
+                                               CONSTRAINT transaction_deliveries_status_check
+                                                   CHECK (status = ANY (ARRAY['pending', 'scheduled', 'on_the_way', 'done', 'cancelled']))
 );
+ALTER TABLE transactions
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false,
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL;
 
+-- Create index for soft delete
+CREATE INDEX idx_transactions_is_deleted ON transactions(is_deleted);
+CREATE INDEX idx_transactions_deleted_at ON transactions(deleted_at);
 CREATE TABLE blacklisted_tokens (
     jti  TEXT PRIMARY KEY,
     expires_at TIMESTAMPTZ NOT NULL,

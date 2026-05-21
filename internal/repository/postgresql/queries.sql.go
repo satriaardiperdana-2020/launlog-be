@@ -12,6 +12,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addPayment = `-- name: AddPayment :one
+
+INSERT INTO transaction_payments (
+    transaction_id, payment_method_id, amount, payment_type, received_by, notes
+)
+VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING id, transaction_id, payment_method_id, amount, payment_type, paid_at, received_by, notes, created_at
+`
+
+type AddPaymentParams struct {
+	TransactionID   int64          `json:"transaction_id"`
+	PaymentMethodID int64          `json:"payment_method_id"`
+	Amount          pgtype.Numeric `json:"amount"`
+	PaymentType     string         `json:"payment_type"`
+	ReceivedBy      int64          `json:"received_by"`
+	Notes           pgtype.Text    `json:"notes"`
+}
+
+// ==================== PAYMENTS ====================
+func (q *Queries) AddPayment(ctx context.Context, arg AddPaymentParams) (TransactionPayment, error) {
+	row := q.db.QueryRow(ctx, addPayment,
+		arg.TransactionID,
+		arg.PaymentMethodID,
+		arg.Amount,
+		arg.PaymentType,
+		arg.ReceivedBy,
+		arg.Notes,
+	)
+	var i TransactionPayment
+	err := row.Scan(
+		&i.ID,
+		&i.TransactionID,
+		&i.PaymentMethodID,
+		&i.Amount,
+		&i.PaymentType,
+		&i.PaidAt,
+		&i.ReceivedBy,
+		&i.Notes,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const addTokenToBlacklist = `-- name: AddTokenToBlacklist :exec
 INSERT INTO blacklisted_tokens (jti, expires_at)
 VALUES ($1, $2)
@@ -52,6 +95,102 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createExpense = `-- name: CreateExpense :one
+
+INSERT INTO transactions (
+    invoice_no, transaction_type, user_id, supplier,
+    expense_category, paid_amount, total_amount, payment_status, notes
+)
+VALUES ($1, 'expenditure', $2, $3, $4, $5, $6, $7, $8)
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+type CreateExpenseParams struct {
+	InvoiceNo       string         `json:"invoice_no"`
+	UserID          int64          `json:"user_id"`
+	Supplier        pgtype.Text    `json:"supplier"`
+	ExpenseCategory pgtype.Text    `json:"expense_category"`
+	PaidAmount      pgtype.Numeric `json:"paid_amount"`
+	TotalAmount     pgtype.Numeric `json:"total_amount"`
+	PaymentStatus   string         `json:"payment_status"`
+	Notes           pgtype.Text    `json:"notes"`
+}
+
+// ==================== EXPENSE ====================
+func (q *Queries) CreateExpense(ctx context.Context, arg CreateExpenseParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, createExpense,
+		arg.InvoiceNo,
+		arg.UserID,
+		arg.Supplier,
+		arg.ExpenseCategory,
+		arg.PaidAmount,
+		arg.TotalAmount,
+		arg.PaymentStatus,
+		arg.Notes,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const createExpenseItem = `-- name: CreateExpenseItem :one
+INSERT INTO transaction_items (
+    transaction_id, item_name, qty, unit_price, notes
+)
+VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, transaction_id, service_id, item_name, qty, unit, unit_price, subtotal, notes
+`
+
+type CreateExpenseItemParams struct {
+	TransactionID int64          `json:"transaction_id"`
+	ItemName      pgtype.Text    `json:"item_name"`
+	Qty           pgtype.Numeric `json:"qty"`
+	UnitPrice     pgtype.Numeric `json:"unit_price"`
+	Notes         pgtype.Text    `json:"notes"`
+}
+
+func (q *Queries) CreateExpenseItem(ctx context.Context, arg CreateExpenseItemParams) (TransactionItem, error) {
+	row := q.db.QueryRow(ctx, createExpenseItem,
+		arg.TransactionID,
+		arg.ItemName,
+		arg.Qty,
+		arg.UnitPrice,
+		arg.Notes,
+	)
+	var i TransactionItem
+	err := row.Scan(
+		&i.ID,
+		&i.TransactionID,
+		&i.ServiceID,
+		&i.ItemName,
+		&i.Qty,
+		&i.Unit,
+		&i.UnitPrice,
+		&i.Subtotal,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -129,9 +268,13 @@ func (q *Queries) CreateServiceCategory(ctx context.Context, arg CreateServiceCa
 }
 
 const createTransaction = `-- name: CreateTransaction :one
-INSERT INTO transactions (invoice_no, type, user_id, customer_id, payment_status, is_delivery, total_amount, notes)
+
+INSERT INTO transactions (
+    invoice_no, transaction_type, user_id, customer_id,
+    payment_status, is_delivery, total_amount, notes
+)
 VALUES ($1, 'income', $2, $3, 'unpaid', $4, $5, $6)
-    RETURNING id, invoice_no, type, user_id, customer_id, payment_method_id, payment_status, is_delivery, paid_amount, supplier, total_amount, notes, transaction_date, created_at, updated_at
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
 `
 
 type CreateTransactionParams struct {
@@ -143,7 +286,7 @@ type CreateTransactionParams struct {
 	Notes       pgtype.Text    `json:"notes"`
 }
 
-// ==================== TRANSACTIONS ====================
+// ==================== INCOME / TRANSACTIONS ====================
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error) {
 	row := q.db.QueryRow(ctx, createTransaction,
 		arg.InvoiceNo,
@@ -157,27 +300,33 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 	err := row.Scan(
 		&i.ID,
 		&i.InvoiceNo,
-		&i.Type,
+		&i.TransactionType,
 		&i.UserID,
 		&i.CustomerID,
 		&i.PaymentMethodID,
 		&i.PaymentStatus,
 		&i.IsDelivery,
-		&i.PaidAmount,
 		&i.Supplier,
+		&i.ExpenseCategory,
 		&i.TotalAmount,
+		&i.PaidAmount,
 		&i.Notes,
 		&i.TransactionDate,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const createTransactionItem = `-- name: CreateTransactionItem :one
-INSERT INTO transaction_items (transaction_id, service_id, qty, unit, unit_price, notes)
+INSERT INTO transaction_items (
+    transaction_id, service_id, qty, unit, unit_price, notes
+)
 SELECT $1, $2, $3, s.unit, s.price, $4
-FROM services s WHERE s.id = $2
+FROM services s
+WHERE s.id = $2
     RETURNING id, transaction_id, service_id, item_name, qty, unit, unit_price, subtotal, notes
 `
 
@@ -257,6 +406,37 @@ func (q *Queries) GetCustomerById(ctx context.Context, id int64) (Customer, erro
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getExpenseById = `-- name: GetExpenseById :one
+SELECT id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at FROM transactions
+WHERE id = $1 AND transaction_type = 'expenditure'
+`
+
+func (q *Queries) GetExpenseById(ctx context.Context, id int64) (Transaction, error) {
+	row := q.db.QueryRow(ctx, getExpenseById, id)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -393,23 +573,196 @@ func (q *Queries) GetServiceDetail(ctx context.Context, id int64) (GetServiceDet
 	return i, err
 }
 
-const getTodayIncomeExpense = `-- name: GetTodayIncomeExpense :one
+const getTransactionById = `-- name: GetTransactionById :one
 SELECT
-    COALESCE(SUM(CASE WHEN type='income' THEN total_amount ELSE 0 END),0) as today_income,
-    COALESCE(SUM(CASE WHEN type='expenditure' THEN total_amount ELSE 0 END),0) as today_expense
-FROM transactions
-WHERE DATE(transaction_date) = CURRENT_DATE
+    t.id, t.invoice_no, t.transaction_type, t.user_id, t.customer_id, t.payment_method_id, t.payment_status, t.is_delivery, t.supplier, t.expense_category, t.total_amount, t.paid_amount, t.notes, t.transaction_date, t.created_at, t.updated_at, t.is_deleted, t.deleted_at,
+    ti.id as item_id,
+    ti.service_id,
+    ti.item_name,
+    ti.qty,
+    ti.unit,
+    ti.unit_price,
+    ti.subtotal,
+    ti.notes as item_notes,
+    s.name as service_name
+FROM transactions t
+         LEFT JOIN transaction_items ti ON t.id = ti.transaction_id
+         LEFT JOIN services s ON ti.service_id = s.id
+WHERE t.id = $1
 `
 
-type GetTodayIncomeExpenseRow struct {
-	TodayIncome  interface{} `json:"today_income"`
-	TodayExpense interface{} `json:"today_expense"`
+type GetTransactionByIdRow struct {
+	ID              int64              `json:"id"`
+	InvoiceNo       string             `json:"invoice_no"`
+	TransactionType string             `json:"transaction_type"`
+	UserID          int64              `json:"user_id"`
+	CustomerID      pgtype.Int8        `json:"customer_id"`
+	PaymentMethodID pgtype.Int8        `json:"payment_method_id"`
+	PaymentStatus   string             `json:"payment_status"`
+	IsDelivery      bool               `json:"is_delivery"`
+	Supplier        pgtype.Text        `json:"supplier"`
+	ExpenseCategory pgtype.Text        `json:"expense_category"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	PaidAmount      pgtype.Numeric     `json:"paid_amount"`
+	Notes           pgtype.Text        `json:"notes"`
+	TransactionDate time.Time          `json:"transaction_date"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+	IsDeleted       pgtype.Bool        `json:"is_deleted"`
+	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
+	ItemID          pgtype.Int8        `json:"item_id"`
+	ServiceID       pgtype.Int8        `json:"service_id"`
+	ItemName        pgtype.Text        `json:"item_name"`
+	Qty             pgtype.Numeric     `json:"qty"`
+	Unit            pgtype.Text        `json:"unit"`
+	UnitPrice       pgtype.Numeric     `json:"unit_price"`
+	Subtotal        pgtype.Numeric     `json:"subtotal"`
+	ItemNotes       pgtype.Text        `json:"item_notes"`
+	ServiceName     pgtype.Text        `json:"service_name"`
 }
 
-func (q *Queries) GetTodayIncomeExpense(ctx context.Context) (GetTodayIncomeExpenseRow, error) {
-	row := q.db.QueryRow(ctx, getTodayIncomeExpense)
-	var i GetTodayIncomeExpenseRow
-	err := row.Scan(&i.TodayIncome, &i.TodayExpense)
+func (q *Queries) GetTransactionById(ctx context.Context, id int64) (GetTransactionByIdRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionById, id)
+	var i GetTransactionByIdRow
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.ItemID,
+		&i.ServiceID,
+		&i.ItemName,
+		&i.Qty,
+		&i.Unit,
+		&i.UnitPrice,
+		&i.Subtotal,
+		&i.ItemNotes,
+		&i.ServiceName,
+	)
+	return i, err
+}
+
+const getTransactionReport = `-- name: GetTransactionReport :many
+SELECT
+    t.id,
+    t.invoice_no,
+    t.transaction_type,
+    t.user_id,
+    t.customer_id,
+    t.payment_status,
+    t.total_amount,
+    t.paid_amount,
+    t.notes,
+    t.transaction_date,
+    COALESCE(c.name, '') as customer_name,
+    COALESCE(t.supplier, '') as supplier,
+    COALESCE(t.expense_category, '') as expense_category
+FROM transactions t
+         LEFT JOIN customers c ON t.customer_id = c.id
+WHERE ($1::date IS NULL OR DATE(t.transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(t.transaction_date) <= $2::date)
+  AND ($3::text IS NULL OR t.transaction_type = $3::text)
+  AND t.is_deleted = false
+ORDER BY t.transaction_date DESC
+`
+
+type GetTransactionReportParams struct {
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
+	Type      string      `json:"type"`
+}
+
+type GetTransactionReportRow struct {
+	ID              int64          `json:"id"`
+	InvoiceNo       string         `json:"invoice_no"`
+	TransactionType string         `json:"transaction_type"`
+	UserID          int64          `json:"user_id"`
+	CustomerID      pgtype.Int8    `json:"customer_id"`
+	PaymentStatus   string         `json:"payment_status"`
+	TotalAmount     pgtype.Numeric `json:"total_amount"`
+	PaidAmount      pgtype.Numeric `json:"paid_amount"`
+	Notes           pgtype.Text    `json:"notes"`
+	TransactionDate time.Time      `json:"transaction_date"`
+	CustomerName    string         `json:"customer_name"`
+	Supplier        string         `json:"supplier"`
+	ExpenseCategory string         `json:"expense_category"`
+}
+
+// ====================TRANSACTION REPORT =====================
+func (q *Queries) GetTransactionReport(ctx context.Context, arg GetTransactionReportParams) ([]GetTransactionReportRow, error) {
+	rows, err := q.db.Query(ctx, getTransactionReport, arg.StartDate, arg.EndDate, arg.Type)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetTransactionReportRow{}
+	for rows.Next() {
+		var i GetTransactionReportRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNo,
+			&i.TransactionType,
+			&i.UserID,
+			&i.CustomerID,
+			&i.PaymentStatus,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.Notes,
+			&i.TransactionDate,
+			&i.CustomerName,
+			&i.Supplier,
+			&i.ExpenseCategory,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTransactionSummary = `-- name: GetTransactionSummary :one
+SELECT
+    COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN total_amount ELSE 0 END), 0) as total_income,
+    COALESCE(SUM(CASE WHEN transaction_type = 'expenditure' THEN total_amount ELSE 0 END), 0) as total_expense,
+    COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN total_amount ELSE -total_amount END), 0) as net_profit
+FROM transactions
+WHERE ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND is_deleted = false
+`
+
+type GetTransactionSummaryParams struct {
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
+}
+
+type GetTransactionSummaryRow struct {
+	TotalIncome  interface{} `json:"total_income"`
+	TotalExpense interface{} `json:"total_expense"`
+	NetProfit    interface{} `json:"net_profit"`
+}
+
+func (q *Queries) GetTransactionSummary(ctx context.Context, arg GetTransactionSummaryParams) (GetTransactionSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getTransactionSummary, arg.StartDate, arg.EndDate)
+	var i GetTransactionSummaryRow
+	err := row.Scan(&i.TotalIncome, &i.TotalExpense, &i.NetProfit)
 	return i, err
 }
 
@@ -508,6 +861,58 @@ func (q *Queries) ListCustomers(ctx context.Context, dollar_1 string) ([]Custome
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listExpenses = `-- name: ListExpenses :many
+SELECT id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at FROM transactions
+WHERE transaction_type = 'expenditure'
+  AND ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+ORDER BY transaction_date DESC
+`
+
+type ListExpensesParams struct {
+	Column1 pgtype.Date `json:"column_1"`
+	Column2 pgtype.Date `json:"column_2"`
+}
+
+func (q *Queries) ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listExpenses, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Transaction{}
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNo,
+			&i.TransactionType,
+			&i.UserID,
+			&i.CustomerID,
+			&i.PaymentMethodID,
+			&i.PaymentStatus,
+			&i.IsDelivery,
+			&i.Supplier,
+			&i.ExpenseCategory,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.Notes,
+			&i.TransactionDate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -637,6 +1042,151 @@ func (q *Queries) ListServices(ctx context.Context, arg ListServicesParams) ([]L
 	return items, nil
 }
 
+const listTransactions = `-- name: ListTransactions :many
+SELECT id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at FROM transactions
+WHERE ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND ($3::text IS NULL OR transaction_type = $3::text)
+ORDER BY transaction_date DESC
+`
+
+type ListTransactionsParams struct {
+	StartDate       pgtype.Date `json:"start_date"`
+	EndDate         pgtype.Date `json:"end_date"`
+	TransactionType string      `json:"transaction_type"`
+}
+
+func (q *Queries) ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listTransactions, arg.StartDate, arg.EndDate, arg.TransactionType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Transaction{}
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNo,
+			&i.TransactionType,
+			&i.UserID,
+			&i.CustomerID,
+			&i.PaymentMethodID,
+			&i.PaymentStatus,
+			&i.IsDelivery,
+			&i.Supplier,
+			&i.ExpenseCategory,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.Notes,
+			&i.TransactionDate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTransactionsByDateRange = `-- name: ListTransactionsByDateRange :many
+SELECT id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at FROM transactions
+WHERE ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND ($3::text IS NULL OR transaction_type = $3::text)
+  AND is_deleted = false
+ORDER BY transaction_date DESC
+`
+
+type ListTransactionsByDateRangeParams struct {
+	Column1 pgtype.Date `json:"column_1"`
+	Column2 pgtype.Date `json:"column_2"`
+	Column3 string      `json:"column_3"`
+}
+
+// ==================== SEARCH BY DATE RANGE ====================
+func (q *Queries) ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error) {
+	rows, err := q.db.Query(ctx, listTransactionsByDateRange, arg.Column1, arg.Column2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Transaction{}
+	for rows.Next() {
+		var i Transaction
+		if err := rows.Scan(
+			&i.ID,
+			&i.InvoiceNo,
+			&i.TransactionType,
+			&i.UserID,
+			&i.CustomerID,
+			&i.PaymentMethodID,
+			&i.PaymentStatus,
+			&i.IsDelivery,
+			&i.Supplier,
+			&i.ExpenseCategory,
+			&i.TotalAmount,
+			&i.PaidAmount,
+			&i.Notes,
+			&i.TransactionDate,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const restoreTransaction = `-- name: RestoreTransaction :one
+UPDATE transactions
+SET
+    is_deleted = false,
+    deleted_at = NULL,
+    updated_at = NOW()
+WHERE id = $1
+  AND is_deleted = true
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+func (q *Queries) RestoreTransaction(ctx context.Context, id int64) (Transaction, error) {
+	row := q.db.QueryRow(ctx, restoreTransaction, id)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const softDeleteCustomer = `-- name: SoftDeleteCustomer :one
 UPDATE customers
 SET
@@ -710,6 +1260,44 @@ func (q *Queries) SoftDeleteServiceCategory(ctx context.Context, id int64) (Serv
 	return i, err
 }
 
+const softDeleteTransaction = `-- name: SoftDeleteTransaction :one
+UPDATE transactions
+SET
+    is_deleted = true,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+  AND is_deleted = false
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+// ==================== SOFT DELETE Transaction====================
+func (q *Queries) SoftDeleteTransaction(ctx context.Context, id int64) (Transaction, error) {
+	row := q.db.QueryRow(ctx, softDeleteTransaction, id)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const updateCustomer = `-- name: UpdateCustomer :one
 UPDATE customers
 SET name = $2,
@@ -746,6 +1334,204 @@ func (q *Queries) UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) 
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateExpense = `-- name: UpdateExpense :one
+UPDATE transactions
+SET
+    supplier = COALESCE($1::text, supplier),
+    expense_category = COALESCE($2::text, expense_category),
+    total_amount = COALESCE($3::numeric, total_amount),
+    paid_amount = COALESCE($4::numeric, paid_amount),
+    notes = COALESCE($5::text, notes),
+    updated_at = NOW()
+WHERE id = $6
+  AND transaction_type = 'expenditure'
+  AND is_deleted = false
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+type UpdateExpenseParams struct {
+	Supplier        pgtype.Text    `json:"supplier"`
+	ExpenseCategory pgtype.Text    `json:"expense_category"`
+	TotalAmount     pgtype.Numeric `json:"total_amount"`
+	PaidAmount      pgtype.Numeric `json:"paid_amount"`
+	Notes           pgtype.Text    `json:"notes"`
+	ID              int64          `json:"id"`
+}
+
+// ==================== UPDATE EXPENSE ====================
+func (q *Queries) UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, updateExpense,
+		arg.Supplier,
+		arg.ExpenseCategory,
+		arg.TotalAmount,
+		arg.PaidAmount,
+		arg.Notes,
+		arg.ID,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateExpenseItem = `-- name: UpdateExpenseItem :one
+UPDATE transaction_items
+SET
+    item_name = COALESCE($1::text, item_name),
+    qty = COALESCE($2::numeric, qty),
+    unit_price = COALESCE($3::numeric, unit_price),
+    notes = COALESCE($4::text, notes)
+WHERE id = $5
+    RETURNING id, transaction_id, service_id, item_name, qty, unit, unit_price, subtotal, notes
+`
+
+type UpdateExpenseItemParams struct {
+	ItemName  pgtype.Text    `json:"item_name"`
+	Qty       pgtype.Numeric `json:"qty"`
+	UnitPrice pgtype.Numeric `json:"unit_price"`
+	Notes     pgtype.Text    `json:"notes"`
+	ID        int64          `json:"id"`
+}
+
+func (q *Queries) UpdateExpenseItem(ctx context.Context, arg UpdateExpenseItemParams) (TransactionItem, error) {
+	row := q.db.QueryRow(ctx, updateExpenseItem,
+		arg.ItemName,
+		arg.Qty,
+		arg.UnitPrice,
+		arg.Notes,
+		arg.ID,
+	)
+	var i TransactionItem
+	err := row.Scan(
+		&i.ID,
+		&i.TransactionID,
+		&i.ServiceID,
+		&i.ItemName,
+		&i.Qty,
+		&i.Unit,
+		&i.UnitPrice,
+		&i.Subtotal,
+		&i.Notes,
+	)
+	return i, err
+}
+
+const updateIncome = `-- name: UpdateIncome :one
+UPDATE transactions
+SET
+    customer_id = COALESCE($1::bigint, customer_id),
+    payment_status = COALESCE($2::text, payment_status),
+    is_delivery = COALESCE($3::bool, is_delivery),
+    total_amount = COALESCE($4::numeric, total_amount),
+    notes = COALESCE($5::text, notes),
+    updated_at = NOW()
+WHERE id = $6
+  AND transaction_type = 'income'
+  AND is_deleted = false
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+type UpdateIncomeParams struct {
+	CustomerID    pgtype.Int8    `json:"customer_id"`
+	PaymentStatus pgtype.Text    `json:"payment_status"`
+	IsDelivery    pgtype.Bool    `json:"is_delivery"`
+	TotalAmount   pgtype.Numeric `json:"total_amount"`
+	Notes         pgtype.Text    `json:"notes"`
+	ID            int64          `json:"id"`
+}
+
+// update and sofdelete expense income
+// ==================== UPDATE INCOME ====================
+func (q *Queries) UpdateIncome(ctx context.Context, arg UpdateIncomeParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, updateIncome,
+		arg.CustomerID,
+		arg.PaymentStatus,
+		arg.IsDelivery,
+		arg.TotalAmount,
+		arg.Notes,
+		arg.ID,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateIncomeItem = `-- name: UpdateIncomeItem :one
+UPDATE transaction_items
+SET
+    qty = COALESCE($1::numeric, qty),
+    unit_price = COALESCE($2::numeric, unit_price),
+    notes = COALESCE($3::text, notes)
+WHERE id = $4
+    RETURNING id, transaction_id, service_id, item_name, qty, unit, unit_price, subtotal, notes
+`
+
+type UpdateIncomeItemParams struct {
+	Qty       pgtype.Numeric `json:"qty"`
+	UnitPrice pgtype.Numeric `json:"unit_price"`
+	Notes     pgtype.Text    `json:"notes"`
+	ID        int64          `json:"id"`
+}
+
+func (q *Queries) UpdateIncomeItem(ctx context.Context, arg UpdateIncomeItemParams) (TransactionItem, error) {
+	row := q.db.QueryRow(ctx, updateIncomeItem,
+		arg.Qty,
+		arg.UnitPrice,
+		arg.Notes,
+		arg.ID,
+	)
+	var i TransactionItem
+	err := row.Scan(
+		&i.ID,
+		&i.TransactionID,
+		&i.ServiceID,
+		&i.ItemName,
+		&i.Qty,
+		&i.Unit,
+		&i.UnitPrice,
+		&i.Subtotal,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -838,6 +1624,55 @@ func (q *Queries) UpdateServiceCategory(ctx context.Context, arg UpdateServiceCa
 		&i.SortOrder,
 		&i.UpdatedAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateTransactionPaymentStatus = `-- name: UpdateTransactionPaymentStatus :one
+UPDATE transactions
+SET
+    payment_status = $2,
+    paid_amount = paid_amount + $3,
+    payment_method_id = $4,
+    updated_at = NOW()
+WHERE id = $1
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+type UpdateTransactionPaymentStatusParams struct {
+	ID              int64          `json:"id"`
+	PaymentStatus   string         `json:"payment_status"`
+	PaidAmount      pgtype.Numeric `json:"paid_amount"`
+	PaymentMethodID pgtype.Int8    `json:"payment_method_id"`
+}
+
+func (q *Queries) UpdateTransactionPaymentStatus(ctx context.Context, arg UpdateTransactionPaymentStatusParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, updateTransactionPaymentStatus,
+		arg.ID,
+		arg.PaymentStatus,
+		arg.PaidAmount,
+		arg.PaymentMethodID,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
 	)
 	return i, err
 }

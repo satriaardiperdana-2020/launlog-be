@@ -180,21 +180,206 @@ SET is_active = false, updated_at = NOW()
 WHERE id = $1 AND is_active = true
     RETURNING *;
 
--- ==================== TRANSACTIONS ====================
+-- ==================== INCOME / TRANSACTIONS ====================
+
 -- name: CreateTransaction :one
-INSERT INTO transactions (invoice_no, type, user_id, customer_id, payment_status, is_delivery, total_amount, notes)
+INSERT INTO transactions (
+    invoice_no, transaction_type, user_id, customer_id,
+    payment_status, is_delivery, total_amount, notes
+)
 VALUES ($1, 'income', $2, $3, 'unpaid', $4, $5, $6)
     RETURNING *;
 
 -- name: CreateTransactionItem :one
-INSERT INTO transaction_items (transaction_id, service_id, qty, unit, unit_price, notes)
+INSERT INTO transaction_items (
+    transaction_id, service_id, qty, unit, unit_price, notes
+)
 SELECT $1, $2, $3, s.unit, s.price, $4
-FROM services s WHERE s.id = $2
+FROM services s
+WHERE s.id = $2
     RETURNING *;
 
--- name: GetTodayIncomeExpense :one
+-- name: GetTransactionById :one
 SELECT
-    COALESCE(SUM(CASE WHEN type='income' THEN total_amount ELSE 0 END),0) as today_income,
-    COALESCE(SUM(CASE WHEN type='expenditure' THEN total_amount ELSE 0 END),0) as today_expense
+    t.*,
+    ti.id as item_id,
+    ti.service_id,
+    ti.item_name,
+    ti.qty,
+    ti.unit,
+    ti.unit_price,
+    ti.subtotal,
+    ti.notes as item_notes,
+    s.name as service_name
+FROM transactions t
+         LEFT JOIN transaction_items ti ON t.id = ti.transaction_id
+         LEFT JOIN services s ON ti.service_id = s.id
+WHERE t.id = $1;
+
+-- name: ListTransactions :many
+SELECT * FROM transactions
+WHERE (sqlc.arg('start_date')::date IS NULL OR DATE(transaction_date) >= sqlc.arg('start_date')::date)
+  AND (sqlc.arg('end_date')::date IS NULL OR DATE(transaction_date) <= sqlc.arg('end_date')::date)
+  AND (sqlc.arg('transaction_type')::text IS NULL OR transaction_type = sqlc.arg('transaction_type')::text)
+ORDER BY transaction_date DESC;
+
+-- ==================== EXPENSE ====================
+
+-- name: CreateExpense :one
+INSERT INTO transactions (
+    invoice_no, transaction_type, user_id, supplier,
+    expense_category, paid_amount, total_amount, payment_status, notes
+)
+VALUES ($1, 'expenditure', $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *;
+
+-- name: CreateExpenseItem :one
+INSERT INTO transaction_items (
+    transaction_id, item_name, qty, unit_price, notes
+)
+VALUES ($1, $2, $3, $4, $5)
+    RETURNING *;
+
+-- name: ListExpenses :many
+SELECT * FROM transactions
+WHERE transaction_type = 'expenditure'
+  AND ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+ORDER BY transaction_date DESC;
+
+-- name: GetExpenseById :one
+SELECT * FROM transactions
+WHERE id = $1 AND transaction_type = 'expenditure';
+
+-- update and sofdelete expense income
+-- ==================== UPDATE INCOME ====================
+-- name: UpdateIncome :one
+UPDATE transactions
+SET
+    customer_id = COALESCE(sqlc.narg('customer_id')::bigint, customer_id),
+    payment_status = COALESCE(sqlc.narg('payment_status')::text, payment_status),
+    is_delivery = COALESCE(sqlc.narg('is_delivery')::bool, is_delivery),
+    total_amount = COALESCE(sqlc.narg('total_amount')::numeric, total_amount),
+    notes = COALESCE(sqlc.narg('notes')::text, notes),
+    updated_at = NOW()
+WHERE id = sqlc.arg('id')
+  AND transaction_type = 'income'
+  AND is_deleted = false
+    RETURNING *;
+
+-- name: UpdateIncomeItem :one
+UPDATE transaction_items
+SET
+    qty = COALESCE(sqlc.narg('qty')::numeric, qty),
+    unit_price = COALESCE(sqlc.narg('unit_price')::numeric, unit_price),
+    notes = COALESCE(sqlc.narg('notes')::text, notes)
+WHERE id = sqlc.arg('id')
+    RETURNING *;
+
+-- ==================== UPDATE EXPENSE ====================
+-- name: UpdateExpense :one
+UPDATE transactions
+SET
+    supplier = COALESCE(sqlc.narg('supplier')::text, supplier),
+    expense_category = COALESCE(sqlc.narg('expense_category')::text, expense_category),
+    total_amount = COALESCE(sqlc.narg('total_amount')::numeric, total_amount),
+    paid_amount = COALESCE(sqlc.narg('paid_amount')::numeric, paid_amount),
+    notes = COALESCE(sqlc.narg('notes')::text, notes),
+    updated_at = NOW()
+WHERE id = sqlc.arg('id')
+  AND transaction_type = 'expenditure'
+  AND is_deleted = false
+    RETURNING *;
+
+-- name: UpdateExpenseItem :one
+UPDATE transaction_items
+SET
+    item_name = COALESCE(sqlc.narg('item_name')::text, item_name),
+    qty = COALESCE(sqlc.narg('qty')::numeric, qty),
+    unit_price = COALESCE(sqlc.narg('unit_price')::numeric, unit_price),
+    notes = COALESCE(sqlc.narg('notes')::text, notes)
+WHERE id = sqlc.arg('id')
+    RETURNING *;
+
+-- ==================== SOFT DELETE Transaction====================
+-- name: SoftDeleteTransaction :one
+UPDATE transactions
+SET
+    is_deleted = true,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+  AND is_deleted = false
+    RETURNING *;
+
+-- name: RestoreTransaction :one
+UPDATE transactions
+SET
+    is_deleted = false,
+    deleted_at = NULL,
+    updated_at = NOW()
+WHERE id = $1
+  AND is_deleted = true
+    RETURNING *;
+
+-- ==================== SEARCH BY DATE RANGE ====================
+-- name: ListTransactionsByDateRange :many
+SELECT * FROM transactions
+WHERE ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND ($3::text IS NULL OR transaction_type = $3::text)
+  AND is_deleted = false
+ORDER BY transaction_date DESC;
+
+
+
+--====================TRANSACTION REPORT =====================
+-- name: GetTransactionReport :many
+SELECT
+    t.id,
+    t.invoice_no,
+    t.transaction_type,
+    t.user_id,
+    t.customer_id,
+    t.payment_status,
+    t.total_amount,
+    t.paid_amount,
+    t.notes,
+    t.transaction_date,
+    COALESCE(c.name, '') as customer_name,
+    COALESCE(t.supplier, '') as supplier,
+    COALESCE(t.expense_category, '') as expense_category
+FROM transactions t
+         LEFT JOIN customers c ON t.customer_id = c.id
+WHERE (sqlc.arg('start_date')::date IS NULL OR DATE(t.transaction_date) >= sqlc.arg('start_date')::date)
+  AND (sqlc.arg('end_date')::date IS NULL OR DATE(t.transaction_date) <= sqlc.arg('end_date')::date)
+  AND (sqlc.arg('type')::text IS NULL OR t.transaction_type = sqlc.arg('type')::text)
+  AND t.is_deleted = false
+ORDER BY t.transaction_date DESC;
+-- name: GetTransactionSummary :one
+SELECT
+    COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN total_amount ELSE 0 END), 0) as total_income,
+    COALESCE(SUM(CASE WHEN transaction_type = 'expenditure' THEN total_amount ELSE 0 END), 0) as total_expense,
+    COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN total_amount ELSE -total_amount END), 0) as net_profit
 FROM transactions
-WHERE DATE(transaction_date) = CURRENT_DATE;
+WHERE (sqlc.arg('start_date')::date IS NULL OR DATE(transaction_date) >= sqlc.arg('start_date')::date)
+  AND (sqlc.arg('end_date')::date IS NULL OR DATE(transaction_date) <= sqlc.arg('end_date')::date)
+  AND is_deleted = false;
+-- ==================== PAYMENTS ====================
+
+-- name: AddPayment :one
+INSERT INTO transaction_payments (
+    transaction_id, payment_method_id, amount, payment_type, received_by, notes
+)
+VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *;
+
+-- name: UpdateTransactionPaymentStatus :one
+UPDATE transactions
+SET
+    payment_status = $2,
+    paid_amount = paid_amount + $3,
+    payment_method_id = $4,
+    updated_at = NOW()
+WHERE id = $1
+    RETURNING *;

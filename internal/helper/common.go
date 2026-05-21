@@ -63,3 +63,31 @@ func nullInt64ToInt64(n sql.NullInt64, defaultValue int64) int64 {
 	}
 	return defaultValue
 }
+func Int64ToIntPtr(i int64) *int {
+	val := int(i)
+	return &val
+}
+
+func PgInt8ToIntPtr(p pgtype.Int8) *int {
+	if !p.Valid {
+		return nil
+	}
+	val := int(p.Int64)
+	return &val
+}
+func stringToPgText(s *string) pgtype.Text {
+	t := pgtype.Text{}
+	if s != nil {
+		t.String = *s
+		t.Valid = true
+	}
+	return t
+}
+
+func dateToPgDate(d *string) pgtype.Date {
+	date := pgtype.Date{}
+	if d != nil {
+		date.Scan(*d)
+	}
+	return date
+}

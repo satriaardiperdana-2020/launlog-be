@@ -28,16 +28,73 @@ const (
 
 // Defines values for PaymentInputPaymentType.
 const (
-	Dp         PaymentInputPaymentType = "dp"
-	Settlement PaymentInputPaymentType = "settlement"
+	PaymentInputPaymentTypeDp         PaymentInputPaymentType = "dp"
+	PaymentInputPaymentTypeSettlement PaymentInputPaymentType = "settlement"
 )
 
 // Valid indicates whether the value is a known member of the PaymentInputPaymentType enum.
 func (e PaymentInputPaymentType) Valid() bool {
 	switch e {
-	case Dp:
+	case PaymentInputPaymentTypeDp:
 		return true
-	case Settlement:
+	case PaymentInputPaymentTypeSettlement:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateTransactionInputPaymentStatus.
+const (
+	UpdateTransactionInputPaymentStatusDp     UpdateTransactionInputPaymentStatus = "dp"
+	UpdateTransactionInputPaymentStatusPaid   UpdateTransactionInputPaymentStatus = "paid"
+	UpdateTransactionInputPaymentStatusUnpaid UpdateTransactionInputPaymentStatus = "unpaid"
+)
+
+// Valid indicates whether the value is a known member of the UpdateTransactionInputPaymentStatus enum.
+func (e UpdateTransactionInputPaymentStatus) Valid() bool {
+	switch e {
+	case UpdateTransactionInputPaymentStatusDp:
+		return true
+	case UpdateTransactionInputPaymentStatusPaid:
+		return true
+	case UpdateTransactionInputPaymentStatusUnpaid:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListTransactionsParamsType.
+const (
+	ListTransactionsParamsTypeExpenditure ListTransactionsParamsType = "expenditure"
+	ListTransactionsParamsTypeIncome      ListTransactionsParamsType = "income"
+)
+
+// Valid indicates whether the value is a known member of the ListTransactionsParamsType enum.
+func (e ListTransactionsParamsType) Valid() bool {
+	switch e {
+	case ListTransactionsParamsTypeExpenditure:
+		return true
+	case ListTransactionsParamsTypeIncome:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetTransactionReportParamsType.
+const (
+	GetTransactionReportParamsTypeExpenditure GetTransactionReportParamsType = "expenditure"
+	GetTransactionReportParamsTypeIncome      GetTransactionReportParamsType = "income"
+)
+
+// Valid indicates whether the value is a known member of the GetTransactionReportParamsType enum.
+func (e GetTransactionReportParamsType) Valid() bool {
+	switch e {
+	case GetTransactionReportParamsTypeExpenditure:
+		return true
+	case GetTransactionReportParamsTypeIncome:
 		return true
 	default:
 		return false
@@ -48,6 +105,24 @@ func (e PaymentInputPaymentType) Valid() bool {
 type AuthResponse struct {
 	Token *string `json:"token,omitempty"`
 	User  *User   `json:"user,omitempty"`
+}
+
+// CreateExpenseJSONRequestBody defines model for CreateExpenseJSONRequestBody.
+type CreateExpenseJSONRequestBody struct {
+	ExpenseCategory string `json:"expenseCategory"`
+	Items           *[]struct {
+		ItemName  *string  `json:"itemName,omitempty"`
+		Notes     *string  `json:"notes,omitempty"`
+		Qty       *float32 `json:"qty,omitempty"`
+		UnitPrice *float32 `json:"unitPrice,omitempty"`
+	} `json:"items,omitempty"`
+	Notes *string `json:"notes,omitempty"`
+
+	// PaidAmount Amount paid (optional, default = totalAmount)
+	PaidAmount  *float32 `json:"paidAmount,omitempty"`
+	Supplier    string   `json:"supplier"`
+	TotalAmount float32  `json:"totalAmount"`
+	UserId      int      `json:"userId"`
 }
 
 // Customer defines model for Customer.
@@ -88,22 +163,6 @@ type DashboardResponse struct {
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
 	Message *string `json:"message,omitempty"`
-}
-
-// ExpenditureInput defines model for ExpenditureInput.
-type ExpenditureInput struct {
-	Items       *[]ExpenditureItem `json:"items,omitempty"`
-	Notes       *string            `json:"notes,omitempty"`
-	Supplier    *string            `json:"supplier,omitempty"`
-	TotalAmount float32            `json:"totalAmount"`
-	UserId      int                `json:"userId"`
-}
-
-// ExpenditureItem defines model for ExpenditureItem.
-type ExpenditureItem struct {
-	ItemName  *string  `json:"itemName,omitempty"`
-	Qty       *float32 `json:"qty,omitempty"`
-	UnitPrice *float32 `json:"unitPrice,omitempty"`
 }
 
 // LoginRequest defines model for LoginRequest.
@@ -271,6 +330,57 @@ type TransactionItem struct {
 	ServiceId *int     `json:"serviceId,omitempty"`
 }
 
+// TransactionReportItem defines model for TransactionReportItem.
+type TransactionReportItem struct {
+	CustomerId      *int       `json:"customerId,omitempty"`
+	CustomerName    *string    `json:"customerName,omitempty"`
+	ExpenseCategory *string    `json:"expenseCategory,omitempty"`
+	Id              *int       `json:"id,omitempty"`
+	InvoiceNo       *string    `json:"invoiceNo,omitempty"`
+	Notes           *string    `json:"notes,omitempty"`
+	PaidAmount      *float32   `json:"paidAmount,omitempty"`
+	PaymentStatus   *string    `json:"paymentStatus,omitempty"`
+	Supplier        *string    `json:"supplier,omitempty"`
+	TotalAmount     *float32   `json:"totalAmount,omitempty"`
+	TransactionDate *time.Time `json:"transactionDate,omitempty"`
+	TransactionType *string    `json:"transactionType,omitempty"`
+	UserId          *int       `json:"userId,omitempty"`
+}
+
+// UpdateExpenseInput defines model for UpdateExpenseInput.
+type UpdateExpenseInput struct {
+	ExpenseCategory *string `json:"expenseCategory,omitempty"`
+	Items           *[]struct {
+		Id        *int     `json:"id,omitempty"`
+		ItemName  *string  `json:"itemName,omitempty"`
+		Notes     *string  `json:"notes,omitempty"`
+		Qty       *float32 `json:"qty,omitempty"`
+		UnitPrice *float32 `json:"unitPrice,omitempty"`
+	} `json:"items,omitempty"`
+	Notes       *string  `json:"notes,omitempty"`
+	PaidAmount  *float32 `json:"paidAmount,omitempty"`
+	Supplier    *string  `json:"supplier,omitempty"`
+	TotalAmount *float32 `json:"totalAmount,omitempty"`
+}
+
+// UpdateTransactionInput defines model for UpdateTransactionInput.
+type UpdateTransactionInput struct {
+	CustomerId *int  `json:"customerId,omitempty"`
+	IsDelivery *bool `json:"isDelivery,omitempty"`
+	Items      *[]struct {
+		Id        *int     `json:"id,omitempty"`
+		Notes     *string  `json:"notes,omitempty"`
+		Qty       *float32 `json:"qty,omitempty"`
+		UnitPrice *float32 `json:"unitPrice,omitempty"`
+	} `json:"items,omitempty"`
+	Notes         *string                              `json:"notes,omitempty"`
+	PaymentStatus *UpdateTransactionInputPaymentStatus `json:"paymentStatus,omitempty"`
+	TotalAmount   *float32                             `json:"totalAmount,omitempty"`
+}
+
+// UpdateTransactionInputPaymentStatus defines model for UpdateTransactionInput.PaymentStatus.
+type UpdateTransactionInputPaymentStatus string
+
 // User defines model for User.
 type User struct {
 	CreatedAt *time.Time `json:"created_at,omitempty"`
@@ -285,6 +395,12 @@ type bearerAuthContextKey string
 // ListCustomersParams defines parameters for ListCustomers.
 type ListCustomersParams struct {
 	Search *string `form:"search,omitempty" json:"search,omitempty"`
+}
+
+// ListExpensesParams defines parameters for ListExpenses.
+type ListExpensesParams struct {
+	StartDate *openapi_types.Date `form:"startDate,omitempty" json:"startDate,omitempty"`
+	EndDate   *openapi_types.Date `form:"endDate,omitempty" json:"endDate,omitempty"`
 }
 
 // ProfitLossReportParams defines parameters for ProfitLossReport.
@@ -304,9 +420,28 @@ type ListServicesParams struct {
 
 // ListTransactionsParams defines parameters for ListTransactions.
 type ListTransactionsParams struct {
-	StartDate *openapi_types.Date `form:"startDate,omitempty" json:"startDate,omitempty"`
-	EndDate   *openapi_types.Date `form:"endDate,omitempty" json:"endDate,omitempty"`
+	StartDate *openapi_types.Date         `form:"startDate,omitempty" json:"startDate,omitempty"`
+	EndDate   *openapi_types.Date         `form:"endDate,omitempty" json:"endDate,omitempty"`
+	Type      *ListTransactionsParamsType `form:"type,omitempty" json:"type,omitempty"`
 }
+
+// ListTransactionsParamsType defines parameters for ListTransactions.
+type ListTransactionsParamsType string
+
+// GetTransactionReportParams defines parameters for GetTransactionReport.
+type GetTransactionReportParams struct {
+	// StartDate Start date (YYYY-MM-DD)
+	StartDate openapi_types.Date `form:"startDate" json:"startDate"`
+
+	// EndDate End date (YYYY-MM-DD)
+	EndDate openapi_types.Date `form:"endDate" json:"endDate"`
+
+	// Type Filter by transaction type (optional)
+	Type *GetTransactionReportParamsType `form:"type,omitempty" json:"type,omitempty"`
+}
+
+// GetTransactionReportParamsType defines parameters for GetTransactionReport.
+type GetTransactionReportParamsType string
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -320,8 +455,11 @@ type CreateCustomerJSONRequestBody = CustomerInput
 // UpdateCustomerJSONRequestBody defines body for UpdateCustomer for application/json ContentType.
 type UpdateCustomerJSONRequestBody = CustomerInput
 
-// CreateExpenditureJSONRequestBody defines body for CreateExpenditure for application/json ContentType.
-type CreateExpenditureJSONRequestBody = ExpenditureInput
+// CreateExpenseJSONRequestBody defines body for CreateExpense for application/json ContentType.
+type CreateExpenseJSONRequestBody = CreateExpenseJSONRequestBody
+
+// UpdateExpenseJSONRequestBody defines body for UpdateExpense for application/json ContentType.
+type UpdateExpenseJSONRequestBody = UpdateExpenseInput
 
 // CreateServiceCategoryJSONRequestBody defines body for CreateServiceCategory for application/json ContentType.
 type CreateServiceCategoryJSONRequestBody = ServiceCategoryInput
@@ -337,6 +475,9 @@ type UpdateServiceJSONRequestBody = ServiceUpdate
 
 // CreateTransactionJSONRequestBody defines body for CreateTransaction for application/json ContentType.
 type CreateTransactionJSONRequestBody = TransactionInput
+
+// UpdateTransactionJSONRequestBody defines body for UpdateTransaction for application/json ContentType.
+type UpdateTransactionJSONRequestBody = UpdateTransactionInput
 
 // AddPaymentJSONRequestBody defines body for AddPayment for application/json ContentType.
 type AddPaymentJSONRequestBody = PaymentInput
@@ -367,9 +508,21 @@ type ServerInterface interface {
 
 	// (GET /dashboard)
 	GetDashboard(ctx echo.Context) error
-
-	// (POST /expenditures)
-	CreateExpenditure(ctx echo.Context) error
+	// List all expenses
+	// (GET /expenses)
+	ListExpenses(ctx echo.Context, params ListExpensesParams) error
+	// Create new expense (pengeluaran)
+	// (POST /expenses)
+	CreateExpense(ctx echo.Context) error
+	// Soft delete expense
+	// (DELETE /expenses/{id})
+	SoftDeleteExpense(ctx echo.Context, id int) error
+	// Get expense by ID
+	// (GET /expenses/{id})
+	GetExpense(ctx echo.Context, id int) error
+	// Update expense
+	// (PUT /expenses/{id})
+	UpdateExpense(ctx echo.Context, id int) error
 
 	// (GET /health)
 	Health(ctx echo.Context) error
@@ -418,9 +571,21 @@ type ServerInterface interface {
 
 	// (POST /transactions)
 	CreateTransaction(ctx echo.Context) error
+	// Get transaction report by date range
+	// (GET /transactions/report)
+	GetTransactionReport(ctx echo.Context, params GetTransactionReportParams) error
+	// Soft delete transaction
+	// (DELETE /transactions/{id})
+	SoftDeleteTransaction(ctx echo.Context, id int) error
+	// Update transaction (income)
+	// (PUT /transactions/{id})
+	UpdateTransaction(ctx echo.Context, id int) error
 
 	// (POST /transactions/{id}/payments)
 	AddPayment(ctx echo.Context, id int) error
+	// Restore soft deleted transaction
+	// (POST /transactions/{id}/restore)
+	RestoreTransaction(ctx echo.Context, id int) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -542,14 +707,95 @@ func (w *ServerInterfaceWrapper) GetDashboard(ctx echo.Context) error {
 	return err
 }
 
-// CreateExpenditure converts echo context to params.
-func (w *ServerInterfaceWrapper) CreateExpenditure(ctx echo.Context) error {
+// ListExpenses converts echo context to params.
+func (w *ServerInterfaceWrapper) ListExpenses(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListExpensesParams
+	// ------------- Optional query parameter "startDate" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "startDate", ctx.QueryParams(), &params.StartDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter startDate: %s", err))
+	}
+
+	// ------------- Optional query parameter "endDate" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "endDate", ctx.QueryParams(), &params.EndDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter endDate: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.ListExpenses(ctx, params)
+	return err
+}
+
+// CreateExpense converts echo context to params.
+func (w *ServerInterfaceWrapper) CreateExpense(ctx echo.Context) error {
 	var err error
 
 	ctx.Set(string(BearerAuthScopes), []string{})
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.CreateExpenditure(ctx)
+	err = w.Handler.CreateExpense(ctx)
+	return err
+}
+
+// SoftDeleteExpense converts echo context to params.
+func (w *ServerInterfaceWrapper) SoftDeleteExpense(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SoftDeleteExpense(ctx, id)
+	return err
+}
+
+// GetExpense converts echo context to params.
+func (w *ServerInterfaceWrapper) GetExpense(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetExpense(ctx, id)
+	return err
+}
+
+// UpdateExpense converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateExpense(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateExpense(ctx, id)
 	return err
 }
 
@@ -808,6 +1054,13 @@ func (w *ServerInterfaceWrapper) ListTransactions(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter endDate: %s", err))
 	}
 
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", ctx.QueryParams(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter type: %s", err))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.ListTransactions(ctx, params)
 	return err
@@ -821,6 +1074,76 @@ func (w *ServerInterfaceWrapper) CreateTransaction(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.CreateTransaction(ctx)
+	return err
+}
+
+// GetTransactionReport converts echo context to params.
+func (w *ServerInterfaceWrapper) GetTransactionReport(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTransactionReportParams
+	// ------------- Required query parameter "startDate" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "startDate", ctx.QueryParams(), &params.StartDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter startDate: %s", err))
+	}
+
+	// ------------- Required query parameter "endDate" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "endDate", ctx.QueryParams(), &params.EndDate, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter endDate: %s", err))
+	}
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", ctx.QueryParams(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter type: %s", err))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetTransactionReport(ctx, params)
+	return err
+}
+
+// SoftDeleteTransaction converts echo context to params.
+func (w *ServerInterfaceWrapper) SoftDeleteTransaction(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.SoftDeleteTransaction(ctx, id)
+	return err
+}
+
+// UpdateTransaction converts echo context to params.
+func (w *ServerInterfaceWrapper) UpdateTransaction(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.UpdateTransaction(ctx, id)
 	return err
 }
 
@@ -839,6 +1162,24 @@ func (w *ServerInterfaceWrapper) AddPayment(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.AddPayment(ctx, id)
+	return err
+}
+
+// RestoreTransaction converts echo context to params.
+func (w *ServerInterfaceWrapper) RestoreTransaction(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+	}
+
+	ctx.Set(string(BearerAuthScopes), []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.RestoreTransaction(ctx, id)
 	return err
 }
 
@@ -897,7 +1238,11 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/customers/:id", wrapper.GetCustomerById, options.OperationMiddlewares["getCustomerById"]...)
 	router.PUT(options.BaseURL+"/customers/:id", wrapper.UpdateCustomer, options.OperationMiddlewares["updateCustomer"]...)
 	router.GET(options.BaseURL+"/dashboard", wrapper.GetDashboard, options.OperationMiddlewares["getDashboard"]...)
-	router.POST(options.BaseURL+"/expenditures", wrapper.CreateExpenditure, options.OperationMiddlewares["createExpenditure"]...)
+	router.GET(options.BaseURL+"/expenses", wrapper.ListExpenses, options.OperationMiddlewares["listExpenses"]...)
+	router.POST(options.BaseURL+"/expenses", wrapper.CreateExpense, options.OperationMiddlewares["createExpense"]...)
+	router.DELETE(options.BaseURL+"/expenses/:id", wrapper.SoftDeleteExpense, options.OperationMiddlewares["softDeleteExpense"]...)
+	router.GET(options.BaseURL+"/expenses/:id", wrapper.GetExpense, options.OperationMiddlewares["getExpense"]...)
+	router.PUT(options.BaseURL+"/expenses/:id", wrapper.UpdateExpense, options.OperationMiddlewares["updateExpense"]...)
 	router.GET(options.BaseURL+"/health", wrapper.Health, options.OperationMiddlewares["health"]...)
 	router.GET(options.BaseURL+"/payment-methods", wrapper.ListPaymentMethods, options.OperationMiddlewares["listPaymentMethods"]...)
 	router.GET(options.BaseURL+"/reports/profit-loss", wrapper.ProfitLossReport, options.OperationMiddlewares["profitLossReport"]...)
@@ -914,7 +1259,11 @@ func RegisterHandlersWithOptions(router EchoRouter, si ServerInterface, options 
 	router.GET(options.BaseURL+"/services/:id/detail", wrapper.GetServiceDetail, options.OperationMiddlewares["getServiceDetail"]...)
 	router.GET(options.BaseURL+"/transactions", wrapper.ListTransactions, options.OperationMiddlewares["listTransactions"]...)
 	router.POST(options.BaseURL+"/transactions", wrapper.CreateTransaction, options.OperationMiddlewares["createTransaction"]...)
+	router.GET(options.BaseURL+"/transactions/report", wrapper.GetTransactionReport, options.OperationMiddlewares["getTransactionReport"]...)
+	router.DELETE(options.BaseURL+"/transactions/:id", wrapper.SoftDeleteTransaction, options.OperationMiddlewares["softDeleteTransaction"]...)
+	router.PUT(options.BaseURL+"/transactions/:id", wrapper.UpdateTransaction, options.OperationMiddlewares["updateTransaction"]...)
 	router.POST(options.BaseURL+"/transactions/:id/payments", wrapper.AddPayment, options.OperationMiddlewares["addPayment"]...)
+	router.POST(options.BaseURL+"/transactions/:id/restore", wrapper.RestoreTransaction, options.OperationMiddlewares["restoreTransaction"]...)
 
 }
 
@@ -1234,17 +1583,39 @@ func (response GetDashboard401Response) VisitGetDashboardResponse(w http.Respons
 	return nil
 }
 
-type CreateExpenditureRequestObject struct {
-	Body *CreateExpenditureJSONRequestBody
+type ListExpensesRequestObject struct {
+	Params ListExpensesParams
 }
 
-type CreateExpenditureResponseObject interface {
-	VisitCreateExpenditureResponse(w http.ResponseWriter) error
+type ListExpensesResponseObject interface {
+	VisitListExpensesResponse(w http.ResponseWriter) error
 }
 
-type CreateExpenditure201JSONResponse Transaction
+type ListExpenses200JSONResponse []Transaction
 
-func (response CreateExpenditure201JSONResponse) VisitCreateExpenditureResponse(w http.ResponseWriter) error {
+func (response ListExpenses200JSONResponse) VisitListExpensesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExpenseRequestObject struct {
+	Body *CreateExpenseJSONRequestBody
+}
+
+type CreateExpenseResponseObject interface {
+	VisitCreateExpenseResponse(w http.ResponseWriter) error
+}
+
+type CreateExpense201JSONResponse Transaction
+
+func (response CreateExpense201JSONResponse) VisitCreateExpenseResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1256,20 +1627,149 @@ func (response CreateExpenditure201JSONResponse) VisitCreateExpenditureResponse(
 	return err
 }
 
-type CreateExpenditure400Response struct {
-}
+type CreateExpense400JSONResponse ErrorResponse
 
-func (response CreateExpenditure400Response) VisitCreateExpenditureResponse(w http.ResponseWriter) error {
+func (response CreateExpense400JSONResponse) VisitCreateExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type CreateExpenditure401Response struct {
-}
+type CreateExpense401JSONResponse ErrorResponse
 
-func (response CreateExpenditure401Response) VisitCreateExpenditureResponse(w http.ResponseWriter) error {
+func (response CreateExpense401JSONResponse) VisitCreateExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SoftDeleteExpenseRequestObject struct {
+	Id int `json:"id"`
+}
+
+type SoftDeleteExpenseResponseObject interface {
+	VisitSoftDeleteExpenseResponse(w http.ResponseWriter) error
+}
+
+type SoftDeleteExpense200JSONResponse Transaction
+
+func (response SoftDeleteExpense200JSONResponse) VisitSoftDeleteExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SoftDeleteExpense404Response struct {
+}
+
+func (response SoftDeleteExpense404Response) VisitSoftDeleteExpenseResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
 	return nil
+}
+
+type GetExpenseRequestObject struct {
+	Id int `json:"id"`
+}
+
+type GetExpenseResponseObject interface {
+	VisitGetExpenseResponse(w http.ResponseWriter) error
+}
+
+type GetExpense200JSONResponse Transaction
+
+func (response GetExpense200JSONResponse) VisitGetExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExpense404JSONResponse ErrorResponse
+
+func (response GetExpense404JSONResponse) VisitGetExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExpenseRequestObject struct {
+	Id   int `json:"id"`
+	Body *UpdateExpenseJSONRequestBody
+}
+
+type UpdateExpenseResponseObject interface {
+	VisitUpdateExpenseResponse(w http.ResponseWriter) error
+}
+
+type UpdateExpense200JSONResponse Transaction
+
+func (response UpdateExpense200JSONResponse) VisitUpdateExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExpense400JSONResponse ErrorResponse
+
+func (response UpdateExpense400JSONResponse) VisitUpdateExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExpense404JSONResponse ErrorResponse
+
+func (response UpdateExpense404JSONResponse) VisitUpdateExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type HealthRequestObject struct {
@@ -1857,20 +2357,190 @@ func (response CreateTransaction201JSONResponse) VisitCreateTransactionResponse(
 	return err
 }
 
-type CreateTransaction400Response struct {
-}
+type CreateTransaction400JSONResponse ErrorResponse
 
-func (response CreateTransaction400Response) VisitCreateTransactionResponse(w http.ResponseWriter) error {
+func (response CreateTransaction400JSONResponse) VisitCreateTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-type CreateTransaction401Response struct {
-}
+type CreateTransaction401JSONResponse ErrorResponse
 
-func (response CreateTransaction401Response) VisitCreateTransactionResponse(w http.ResponseWriter) error {
+func (response CreateTransaction401JSONResponse) VisitCreateTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTransactionReportRequestObject struct {
+	Params GetTransactionReportParams
+}
+
+type GetTransactionReportResponseObject interface {
+	VisitGetTransactionReportResponse(w http.ResponseWriter) error
+}
+
+type GetTransactionReport200JSONResponse struct {
+	Summary *struct {
+		NetProfit    *float32 `json:"netProfit,omitempty"`
+		TotalExpense *float32 `json:"totalExpense,omitempty"`
+		TotalIncome  *float32 `json:"totalIncome,omitempty"`
+	} `json:"summary,omitempty"`
+	Transactions *[]TransactionReportItem `json:"transactions,omitempty"`
+}
+
+func (response GetTransactionReport200JSONResponse) VisitGetTransactionReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTransactionReport400JSONResponse ErrorResponse
+
+func (response GetTransactionReport400JSONResponse) VisitGetTransactionReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTransactionReport401JSONResponse ErrorResponse
+
+func (response GetTransactionReport401JSONResponse) VisitGetTransactionReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SoftDeleteTransactionRequestObject struct {
+	Id int `json:"id"`
+}
+
+type SoftDeleteTransactionResponseObject interface {
+	VisitSoftDeleteTransactionResponse(w http.ResponseWriter) error
+}
+
+type SoftDeleteTransaction200JSONResponse Transaction
+
+func (response SoftDeleteTransaction200JSONResponse) VisitSoftDeleteTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SoftDeleteTransaction404JSONResponse ErrorResponse
+
+func (response SoftDeleteTransaction404JSONResponse) VisitSoftDeleteTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTransactionRequestObject struct {
+	Id   int `json:"id"`
+	Body *UpdateTransactionJSONRequestBody
+}
+
+type UpdateTransactionResponseObject interface {
+	VisitUpdateTransactionResponse(w http.ResponseWriter) error
+}
+
+type UpdateTransaction200JSONResponse Transaction
+
+func (response UpdateTransaction200JSONResponse) VisitUpdateTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTransaction400JSONResponse ErrorResponse
+
+func (response UpdateTransaction400JSONResponse) VisitUpdateTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTransaction401JSONResponse ErrorResponse
+
+func (response UpdateTransaction401JSONResponse) VisitUpdateTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTransaction404JSONResponse ErrorResponse
+
+func (response UpdateTransaction404JSONResponse) VisitUpdateTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type AddPaymentRequestObject struct {
@@ -1912,6 +2582,56 @@ func (response AddPayment401Response) VisitAddPaymentResponse(w http.ResponseWri
 	return nil
 }
 
+type RestoreTransactionRequestObject struct {
+	Id int `json:"id"`
+}
+
+type RestoreTransactionResponseObject interface {
+	VisitRestoreTransactionResponse(w http.ResponseWriter) error
+}
+
+type RestoreTransaction200JSONResponse Transaction
+
+func (response RestoreTransaction200JSONResponse) VisitRestoreTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTransaction400JSONResponse ErrorResponse
+
+func (response RestoreTransaction400JSONResponse) VisitRestoreTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreTransaction404JSONResponse ErrorResponse
+
+func (response RestoreTransaction404JSONResponse) VisitRestoreTransactionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -1938,9 +2658,21 @@ type StrictServerInterface interface {
 
 	// (GET /dashboard)
 	GetDashboard(ctx context.Context, request GetDashboardRequestObject) (GetDashboardResponseObject, error)
-
-	// (POST /expenditures)
-	CreateExpenditure(ctx context.Context, request CreateExpenditureRequestObject) (CreateExpenditureResponseObject, error)
+	// List all expenses
+	// (GET /expenses)
+	ListExpenses(ctx context.Context, request ListExpensesRequestObject) (ListExpensesResponseObject, error)
+	// Create new expense (pengeluaran)
+	// (POST /expenses)
+	CreateExpense(ctx context.Context, request CreateExpenseRequestObject) (CreateExpenseResponseObject, error)
+	// Soft delete expense
+	// (DELETE /expenses/{id})
+	SoftDeleteExpense(ctx context.Context, request SoftDeleteExpenseRequestObject) (SoftDeleteExpenseResponseObject, error)
+	// Get expense by ID
+	// (GET /expenses/{id})
+	GetExpense(ctx context.Context, request GetExpenseRequestObject) (GetExpenseResponseObject, error)
+	// Update expense
+	// (PUT /expenses/{id})
+	UpdateExpense(ctx context.Context, request UpdateExpenseRequestObject) (UpdateExpenseResponseObject, error)
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -1989,9 +2721,21 @@ type StrictServerInterface interface {
 
 	// (POST /transactions)
 	CreateTransaction(ctx context.Context, request CreateTransactionRequestObject) (CreateTransactionResponseObject, error)
+	// Get transaction report by date range
+	// (GET /transactions/report)
+	GetTransactionReport(ctx context.Context, request GetTransactionReportRequestObject) (GetTransactionReportResponseObject, error)
+	// Soft delete transaction
+	// (DELETE /transactions/{id})
+	SoftDeleteTransaction(ctx context.Context, request SoftDeleteTransactionRequestObject) (SoftDeleteTransactionResponseObject, error)
+	// Update transaction (income)
+	// (PUT /transactions/{id})
+	UpdateTransaction(ctx context.Context, request UpdateTransactionRequestObject) (UpdateTransactionResponseObject, error)
 
 	// (POST /transactions/{id}/payments)
 	AddPayment(ctx context.Context, request AddPaymentRequestObject) (AddPaymentResponseObject, error)
+	// Restore soft deleted transaction
+	// (POST /transactions/{id}/restore)
+	RestoreTransaction(ctx context.Context, request RestoreTransactionRequestObject) (RestoreTransactionResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx echo.Context, request any) (any, error)
@@ -2222,29 +2966,135 @@ func (sh *strictHandler) GetDashboard(ctx echo.Context) error {
 	return nil
 }
 
-// CreateExpenditure operation middleware
-func (sh *strictHandler) CreateExpenditure(ctx echo.Context) error {
-	var request CreateExpenditureRequestObject
+// ListExpenses operation middleware
+func (sh *strictHandler) ListExpenses(ctx echo.Context, params ListExpensesParams) error {
+	var request ListExpensesRequestObject
 
-	var body CreateExpenditureJSONRequestBody
-	if err := ctx.Bind(&body); err != nil {
-		return err
-	}
-	request.Body = &body
+	request.Params = params
 
 	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateExpenditure(ctx.Request().Context(), request.(CreateExpenditureRequestObject))
+		return sh.ssi.ListExpenses(ctx.Request().Context(), request.(ListExpensesRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateExpenditure")
+		handler = middleware(handler, "ListExpenses")
 	}
 
 	response, err := handler(ctx, request)
 
 	if err != nil {
 		return err
-	} else if validResponse, ok := response.(CreateExpenditureResponseObject); ok {
-		return validResponse.VisitCreateExpenditureResponse(ctx.Response())
+	} else if validResponse, ok := response.(ListExpensesResponseObject); ok {
+		return validResponse.VisitListExpensesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// CreateExpense operation middleware
+func (sh *strictHandler) CreateExpense(ctx echo.Context) error {
+	var request CreateExpenseRequestObject
+
+	var body CreateExpenseJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateExpense(ctx.Request().Context(), request.(CreateExpenseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateExpense")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(CreateExpenseResponseObject); ok {
+		return validResponse.VisitCreateExpenseResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SoftDeleteExpense operation middleware
+func (sh *strictHandler) SoftDeleteExpense(ctx echo.Context, id int) error {
+	var request SoftDeleteExpenseRequestObject
+
+	request.Id = id
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SoftDeleteExpense(ctx.Request().Context(), request.(SoftDeleteExpenseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SoftDeleteExpense")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SoftDeleteExpenseResponseObject); ok {
+		return validResponse.VisitSoftDeleteExpenseResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetExpense operation middleware
+func (sh *strictHandler) GetExpense(ctx echo.Context, id int) error {
+	var request GetExpenseRequestObject
+
+	request.Id = id
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetExpense(ctx.Request().Context(), request.(GetExpenseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetExpense")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetExpenseResponseObject); ok {
+		return validResponse.VisitGetExpenseResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpdateExpense operation middleware
+func (sh *strictHandler) UpdateExpense(ctx echo.Context, id int) error {
+	var request UpdateExpenseRequestObject
+
+	request.Id = id
+
+	var body UpdateExpenseJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateExpense(ctx.Request().Context(), request.(UpdateExpenseRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateExpense")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(UpdateExpenseResponseObject); ok {
+		return validResponse.VisitUpdateExpenseResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -2669,6 +3519,87 @@ func (sh *strictHandler) CreateTransaction(ctx echo.Context) error {
 	return nil
 }
 
+// GetTransactionReport operation middleware
+func (sh *strictHandler) GetTransactionReport(ctx echo.Context, params GetTransactionReportParams) error {
+	var request GetTransactionReportRequestObject
+
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTransactionReport(ctx.Request().Context(), request.(GetTransactionReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTransactionReport")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetTransactionReportResponseObject); ok {
+		return validResponse.VisitGetTransactionReportResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// SoftDeleteTransaction operation middleware
+func (sh *strictHandler) SoftDeleteTransaction(ctx echo.Context, id int) error {
+	var request SoftDeleteTransactionRequestObject
+
+	request.Id = id
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.SoftDeleteTransaction(ctx.Request().Context(), request.(SoftDeleteTransactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SoftDeleteTransaction")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(SoftDeleteTransactionResponseObject); ok {
+		return validResponse.VisitSoftDeleteTransactionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// UpdateTransaction operation middleware
+func (sh *strictHandler) UpdateTransaction(ctx echo.Context, id int) error {
+	var request UpdateTransactionRequestObject
+
+	request.Id = id
+
+	var body UpdateTransactionJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTransaction(ctx.Request().Context(), request.(UpdateTransactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTransaction")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(UpdateTransactionResponseObject); ok {
+		return validResponse.VisitUpdateTransactionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // AddPayment operation middleware
 func (sh *strictHandler) AddPayment(ctx echo.Context, id int) error {
 	var request AddPaymentRequestObject
@@ -2700,44 +3631,77 @@ func (sh *strictHandler) AddPayment(ctx echo.Context, id int) error {
 	return nil
 }
 
+// RestoreTransaction operation middleware
+func (sh *strictHandler) RestoreTransaction(ctx echo.Context, id int) error {
+	var request RestoreTransactionRequestObject
+
+	request.Id = id
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreTransaction(ctx.Request().Context(), request.(RestoreTransactionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreTransaction")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(RestoreTransactionResponseObject); ok {
+		return validResponse.VisitRestoreTransactionResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

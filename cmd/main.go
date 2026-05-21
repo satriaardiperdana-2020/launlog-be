@@ -33,16 +33,18 @@ func main() {
 	}
 	customerHandler := &handlers.CustomerHandler{Queries: queries}
 	serviceHandler := &handlers.ServiceHandler{Queries: queries}
-	//txHandler := &handlers.TransactionHandler{Queries: queries}
+	txHandler := &handlers.TransactionHandler{Queries: queries}
+	expenseHandler := &handlers.ExpenseHandler{Queries: queries}
 	// ... other handlers
 
 	// Combine handlers into a single server that implements the strict interface
 	server := &handlers.LaunlogServer{
-		Queries:         queries,
-		AuthHandler:     authHandler,
-		CustomerHandler: customerHandler,
-		ServiceHandler:  serviceHandler,
-		//Transaction: txHandler,
+		Queries:            queries,
+		AuthHandler:        authHandler,
+		CustomerHandler:    customerHandler,
+		ServiceHandler:     serviceHandler,
+		TransactionHandler: txHandler,
+		ExpenseHandler:     expenseHandler,
 	}
 
 	// Create Echo instance

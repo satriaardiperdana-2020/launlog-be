@@ -484,8 +484,16 @@ paths:
                 $ref: '#/components/schemas/Transaction'
         '400':
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     get:
       operationId: listTransactions
       parameters:
@@ -495,6 +503,11 @@ paths:
         - name: endDate
           in: query
           schema: { type: string, format: date }
+        - name: type                    # ← TAMBAHKAN INI
+          in: query
+          schema:
+            type: string
+            enum: [ income, expenditure ]
       responses:
         '200':
           description: OK
@@ -532,17 +545,169 @@ paths:
           description: Bad request
         '401':
           description: Unauthorized
-
-  # ==================== EXPENDITURES (PERLU AUTH) ====================
-  /expenditures:
-    post:
-      operationId: createExpenditure
+  /transactions/{id}:
+    put:
+      operationId: updateTransaction
+      summary: Update transaction (income)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ExpenditureInput'
+              $ref: '#/components/schemas/UpdateTransactionInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Transaction Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      operationId: softDeleteTransaction
+      summary: Soft delete transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Soft deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transactions/{id}/restore:
+    post:
+      operationId: restoreTransaction
+      summary: Restore soft deleted transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /transactions/report:
+    get:
+      operationId: getTransactionReport
+      summary: Get transaction report by date range
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: Start date (YYYY-MM-DD)
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          description: End date (YYYY-MM-DD)
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [ income, expenditure ]
+          description: Filter by transaction type (optional)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransactionReportItem'
+                  summary:
+                    type: object
+                    properties:
+                      totalIncome:
+                        type: number
+                      totalExpense:
+                        type: number
+                      netProfit:
+                        type: number
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ==================== Expenses ====================
+  /expenses:
+    post:
+      operationId: createExpense
+      summary: Create new expense (pengeluaran)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseJSONRequestBody'
       responses:
         '201':
           description: Created
@@ -552,8 +717,115 @@ paths:
                 $ref: '#/components/schemas/Transaction'
         '400':
           description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      operationId: listExpenses
+      summary: List all expenses
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+
+  /expenses/{id}:
+    get:
+      operationId: getExpense
+      summary: Get expense by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: updateExpense
+      summary: Update expense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExpenseInput'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Expense Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      operationId: softDeleteExpense
+      summary: Soft delete expense
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Soft deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Not found
+
 
   # ==================== DASHBOARD & REPORTS (PERLU AUTH) ====================
   /dashboard:
@@ -749,6 +1021,100 @@ components:
         description: { type: string }
         sortOrder: { type: integer }
 
+    UpdateTransactionInput:
+      type: object
+      properties:
+        customerId:
+          type: integer
+        paymentStatus:
+          type: string
+          enum: [ unpaid, dp, paid ]
+        isDelivery:
+          type: boolean
+        totalAmount:
+          type: number
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              qty:
+                type: number
+              unitPrice:
+                type: number
+              notes:
+                type: string
+
+
+    # ==================== EXPENSES ====================
+    CreateExpenseJSONRequestBody:
+      type: object
+      required:
+        - userId
+        - supplier
+        - expenseCategory
+        - totalAmount
+      properties:
+        userId:
+          type: integer
+        supplier:
+          type: string
+        expenseCategory:
+          type: string
+        totalAmount:
+          type: number
+        paidAmount:
+          type: number
+          description: Amount paid (optional, default = totalAmount)
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              itemName:
+                type: string
+              qty:
+                type: number
+              unitPrice:
+                type: number
+              notes:
+                type: string
+
+    UpdateExpenseInput:
+      type: object
+      properties:
+        supplier:
+          type: string
+        expenseCategory:
+          type: string
+        totalAmount:
+          type: number
+        paidAmount:
+          type: number
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              itemName:
+                type: string
+              qty:
+                type: number
+              unitPrice:
+                type: number
+              notes:
+                type: string
+
     PaymentMethod:
       type: object
       properties:
@@ -800,26 +1166,6 @@ components:
         userId: { type: integer }
         notes: { type: string }
 
-    ExpenditureItem:
-      type: object
-      properties:
-        itemName: { type: string }
-        qty: { type: number }
-        unitPrice: { type: number }
-
-    ExpenditureInput:
-      type: object
-      required: [userId, totalAmount, itemName]
-      properties:
-        userId: { type: integer }
-        supplier: { type: string }
-        totalAmount: { type: number }
-        notes: { type: string }
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExpenditureItem'
-
     DashboardResponse:
       type: object
       properties:
@@ -841,6 +1187,36 @@ components:
               income: { type: number }
               expense: { type: number }
 
+    TransactionReportItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoiceNo:
+          type: string
+        transactionType:
+          type: string
+        userId:
+          type: integer
+        customerId:
+          type: integer
+        customerName:
+          type: string
+        supplier:
+          type: string
+        expenseCategory:
+          type: string
+        paymentStatus:
+          type: string
+        totalAmount:
+          type: number
+        paidAmount:
+          type: number
+        notes:
+          type: string
+        transactionDate:
+          type: string
+          format: date-time
   # ==================== SECURITY SCHEMES ====================
   securitySchemes:
     BearerAuth:

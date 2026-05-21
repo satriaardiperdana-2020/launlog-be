@@ -7,12 +7,13 @@ import (
 )
 
 type LaunlogServer struct {
-	Queries         *postgresql.Queries
-	JWTSecret       []byte
-	AuthHandler     *AuthHandler
-	CustomerHandler *CustomerHandler
-	ServiceHandler  *ServiceHandler
-	//TransactionHandler *TransactionHandler
+	Queries            *postgresql.Queries
+	JWTSecret          []byte
+	AuthHandler        *AuthHandler
+	CustomerHandler    *CustomerHandler
+	ServiceHandler     *ServiceHandler
+	TransactionHandler *TransactionHandler
+	ExpenseHandler     *ExpenseHandler
 	// Add other handlers (Service, Payment, Report) as needed
 }
 
@@ -52,26 +53,6 @@ func (s *LaunlogServer) UpdateCustomer(ctx context.Context, req api.UpdateCustom
 
 func (s *LaunlogServer) SoftDeleteCustomer(ctx context.Context, req api.SoftDeleteCustomerRequestObject) (api.SoftDeleteCustomerResponseObject, error) {
 	return s.CustomerHandler.SoftDeleteCustomer(ctx, req)
-}
-
-// ---------- Transactions ----------
-func (s *LaunlogServer) CreateTransaction(ctx context.Context, req api.CreateTransactionRequestObject) (api.CreateTransactionResponseObject, error) {
-	return s.CreateTransaction(ctx, req)
-}
-
-func (s *LaunlogServer) ListTransactions(ctx context.Context, req api.ListTransactionsRequestObject) (api.ListTransactionsResponseObject, error) {
-	// Stub: return empty list (200)
-	return api.ListTransactions200JSONResponse([]api.Transaction{}), nil
-}
-
-func (s *LaunlogServer) AddPayment(ctx context.Context, req api.AddPaymentRequestObject) (api.AddPaymentResponseObject, error) {
-	// Stub: return empty Transaction (200)
-	return api.AddPayment200JSONResponse(api.Transaction{}), nil
-}
-
-func (s *LaunlogServer) CreateExpenditure(ctx context.Context, req api.CreateExpenditureRequestObject) (api.CreateExpenditureResponseObject, error) {
-	// Stub: return empty Transaction (201)
-	return api.CreateExpenditure201JSONResponse(api.Transaction{}), nil
 }
 
 // ---------- Services ----------
@@ -123,6 +104,23 @@ func (s *LaunlogServer) ListPaymentMethods(ctx context.Context, req api.ListPaym
 	return api.ListPaymentMethods200JSONResponse([]api.PaymentMethod{}), nil
 }
 
+// ---------- Transactions ----------
+func (s *LaunlogServer) CreateTransaction(ctx context.Context, req api.CreateTransactionRequestObject) (api.CreateTransactionResponseObject, error) {
+	return s.TransactionHandler.CreateTransaction(ctx, req)
+}
+
+func (s *LaunlogServer) ListTransactions(ctx context.Context, req api.ListTransactionsRequestObject) (api.ListTransactionsResponseObject, error) {
+	return s.TransactionHandler.ListTransactions(ctx, req)
+}
+
+func (s *LaunlogServer) CreateExpense(ctx context.Context, req api.CreateExpenseRequestObject) (api.CreateExpenseResponseObject, error) {
+	return s.ExpenseHandler.CreateExpense(ctx, req)
+}
+
+func (s *LaunlogServer) ListExpenses(ctx context.Context, req api.ListExpensesRequestObject) (api.ListExpensesResponseObject, error) {
+	return s.ExpenseHandler.ListExpenses(ctx, req)
+}
+
 // ---------- Dashboard & Reports ----------
 func (s *LaunlogServer) GetDashboard(ctx context.Context, req api.GetDashboardRequestObject) (api.GetDashboardResponseObject, error) {
 	// Stub: return zero dashboard (200)
@@ -150,4 +148,31 @@ func (s *LaunlogServer) Health(ctx context.Context, req api.HealthRequestObject)
 	return api.Health200JSONResponse(struct {
 		Status *string `json:"status,omitempty"`
 	}{Status: &status}), nil
+}
+func (s *LaunlogServer) AddPayment(ctx context.Context, req api.AddPaymentRequestObject) (api.AddPaymentResponseObject, error) {
+	// Stub: return empty Transaction (200)
+	return api.AddPayment200JSONResponse(api.Transaction{}), nil
+}
+func (s *LaunlogServer) UpdateTransaction(ctx context.Context, req api.UpdateTransactionRequestObject) (api.UpdateTransactionResponseObject, error) {
+	return s.TransactionHandler.UpdateTransaction(ctx, req)
+}
+
+func (s *LaunlogServer) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
+	return s.TransactionHandler.SoftDeleteTransaction(ctx, req)
+}
+
+func (s *LaunlogServer) RestoreTransaction(ctx context.Context, req api.RestoreTransactionRequestObject) (api.RestoreTransactionResponseObject, error) {
+	return s.TransactionHandler.RestoreTransaction(ctx, req)
+}
+
+func (s *LaunlogServer) GetTransactionReport(ctx context.Context, req api.GetTransactionReportRequestObject) (api.GetTransactionReportResponseObject, error) {
+	return s.TransactionHandler.GetTransactionReport(ctx, req)
+}
+
+func (s *LaunlogServer) UpdateExpense(ctx context.Context, req api.UpdateExpenseRequestObject) (api.UpdateExpenseResponseObject, error) {
+	return s.ExpenseHandler.UpdateExpense(ctx, req)
+}
+
+func (s *LaunlogServer) SoftDeleteExpense(ctx context.Context, req api.SoftDeleteExpenseRequestObject) (api.SoftDeleteExpenseResponseObject, error) {
+	return s.ExpenseHandler.SoftDeleteExpense(ctx, req)
 }

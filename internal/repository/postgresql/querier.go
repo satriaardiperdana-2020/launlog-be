@@ -9,36 +9,60 @@ import (
 )
 
 type Querier interface {
+	// ==================== PAYMENTS ====================
+	AddPayment(ctx context.Context, arg AddPaymentParams) (TransactionPayment, error)
 	// ==================== BLACKLIST TOKENS ====================
 	AddTokenToBlacklist(ctx context.Context, arg AddTokenToBlacklistParams) error
 	// ==================== CUSTOMERS ====================
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	// ==================== EXPENSE ====================
+	CreateExpense(ctx context.Context, arg CreateExpenseParams) (Transaction, error)
+	CreateExpenseItem(ctx context.Context, arg CreateExpenseItemParams) (TransactionItem, error)
 	// ==================== SERVICES ====================
 	CreateService(ctx context.Context, arg CreateServiceParams) (Service, error)
 	// ==================== SERVICE CATEGORIES ====================
 	CreateServiceCategory(ctx context.Context, arg CreateServiceCategoryParams) (ServiceCategory, error)
-	// ==================== TRANSACTIONS ====================
+	// ==================== INCOME / TRANSACTIONS ====================
 	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
 	CreateTransactionItem(ctx context.Context, arg CreateTransactionItemParams) (TransactionItem, error)
 	// ==================== AUTH & USERS ====================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	GetCustomerById(ctx context.Context, id int64) (Customer, error)
+	GetExpenseById(ctx context.Context, id int64) (Transaction, error)
 	GetServiceById(ctx context.Context, id int64) (GetServiceByIdRow, error)
 	GetServiceCategoryByID(ctx context.Context, id int64) (GetServiceCategoryByIDRow, error)
 	GetServiceDetail(ctx context.Context, id int64) (GetServiceDetailRow, error)
-	GetTodayIncomeExpense(ctx context.Context) (GetTodayIncomeExpenseRow, error)
+	GetTransactionById(ctx context.Context, id int64) (GetTransactionByIdRow, error)
+	//====================TRANSACTION REPORT =====================
+	GetTransactionReport(ctx context.Context, arg GetTransactionReportParams) ([]GetTransactionReportRow, error)
+	GetTransactionSummary(ctx context.Context, arg GetTransactionSummaryParams) (GetTransactionSummaryRow, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
 	IsTokenBlacklisted(ctx context.Context, jti string) (bool, error)
 	ListCustomers(ctx context.Context, dollar_1 string) ([]Customer, error)
+	ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Transaction, error)
 	ListServiceCategories(ctx context.Context) ([]ListServiceCategoriesRow, error)
 	ListServices(ctx context.Context, arg ListServicesParams) ([]ListServicesRow, error)
+	ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]Transaction, error)
+	// ==================== SEARCH BY DATE RANGE ====================
+	ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error)
+	RestoreTransaction(ctx context.Context, id int64) (Transaction, error)
 	SoftDeleteCustomer(ctx context.Context, id int64) (Customer, error)
 	SoftDeleteService(ctx context.Context, id int64) (Service, error)
 	SoftDeleteServiceCategory(ctx context.Context, id int64) (ServiceCategory, error)
+	// ==================== SOFT DELETE Transaction====================
+	SoftDeleteTransaction(ctx context.Context, id int64) (Transaction, error)
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
+	// ==================== UPDATE EXPENSE ====================
+	UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (Transaction, error)
+	UpdateExpenseItem(ctx context.Context, arg UpdateExpenseItemParams) (TransactionItem, error)
+	// update and sofdelete expense income
+	// ==================== UPDATE INCOME ====================
+	UpdateIncome(ctx context.Context, arg UpdateIncomeParams) (Transaction, error)
+	UpdateIncomeItem(ctx context.Context, arg UpdateIncomeItemParams) (TransactionItem, error)
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (Service, error)
 	UpdateServiceCategory(ctx context.Context, arg UpdateServiceCategoryParams) (ServiceCategory, error)
+	UpdateTransactionPaymentStatus(ctx context.Context, arg UpdateTransactionPaymentStatusParams) (Transaction, error)
 }
 
 var _ Querier = (*Queries)(nil)

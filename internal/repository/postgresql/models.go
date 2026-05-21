@@ -94,27 +94,30 @@ type ServiceCategory struct {
 }
 
 type Transaction struct {
-	ID              int64          `json:"id"`
-	InvoiceNo       string         `json:"invoice_no"`
-	Type            string         `json:"type"`
-	UserID          int64          `json:"user_id"`
-	CustomerID      pgtype.Int8    `json:"customer_id"`
-	PaymentMethodID pgtype.Int8    `json:"payment_method_id"`
-	PaymentStatus   string         `json:"payment_status"`
-	IsDelivery      bool           `json:"is_delivery"`
-	PaidAmount      pgtype.Numeric `json:"paid_amount"`
-	Supplier        pgtype.Text    `json:"supplier"`
-	TotalAmount     pgtype.Numeric `json:"total_amount"`
-	Notes           pgtype.Text    `json:"notes"`
-	TransactionDate time.Time      `json:"transaction_date"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	ID              int64              `json:"id"`
+	InvoiceNo       string             `json:"invoice_no"`
+	TransactionType string             `json:"transaction_type"`
+	UserID          int64              `json:"user_id"`
+	CustomerID      pgtype.Int8        `json:"customer_id"`
+	PaymentMethodID pgtype.Int8        `json:"payment_method_id"`
+	PaymentStatus   string             `json:"payment_status"`
+	IsDelivery      bool               `json:"is_delivery"`
+	Supplier        pgtype.Text        `json:"supplier"`
+	ExpenseCategory pgtype.Text        `json:"expense_category"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	PaidAmount      pgtype.Numeric     `json:"paid_amount"`
+	Notes           pgtype.Text        `json:"notes"`
+	TransactionDate time.Time          `json:"transaction_date"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+	IsDeleted       pgtype.Bool        `json:"is_deleted"`
+	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type TransactionDelivery struct {
 	ID            int64              `json:"id"`
 	TransactionID int64              `json:"transaction_id"`
-	Type          string             `json:"type"`
+	TdType        string             `json:"td_type"`
 	Status        string             `json:"status"`
 	Address       string             `json:"address"`
 	ScheduledAt   pgtype.Timestamptz `json:"scheduled_at"`
