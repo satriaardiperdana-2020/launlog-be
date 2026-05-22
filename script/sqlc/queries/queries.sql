@@ -218,9 +218,9 @@ WHERE t.id = $1;
 
 -- name: ListTransactions :many
 SELECT * FROM transactions
-WHERE (sqlc.arg('start_date')::date IS NULL OR DATE(transaction_date) >= sqlc.arg('start_date')::date)
-  AND (sqlc.arg('end_date')::date IS NULL OR DATE(transaction_date) <= sqlc.arg('end_date')::date)
-  AND (sqlc.arg('transaction_type')::text IS NULL OR transaction_type = sqlc.arg('transaction_type')::text)
+WHERE ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
+  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND ($3::text IS NULL OR transaction_type = $3::text)
 ORDER BY transaction_date DESC;
 
 -- ==================== EXPENSE ====================
@@ -243,8 +243,9 @@ VALUES ($1, $2, $3, $4, $5)
 -- name: ListExpenses :many
 SELECT * FROM transactions
 WHERE transaction_type = 'expenditure'
-  AND ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
-  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND (sqlc.arg('start_date')::date IS NULL OR DATE(transaction_date) >= sqlc.arg('start_date')::date)
+  AND (sqlc.arg('end_date')::date IS NULL OR DATE(transaction_date) <= sqlc.arg('end_date')::date)
+  AND is_deleted = false
 ORDER BY transaction_date DESC;
 
 -- name: GetExpenseById :one
@@ -301,26 +302,18 @@ SET
 WHERE id = sqlc.arg('id')
     RETURNING *;
 
--- ==================== SOFT DELETE Transaction====================
--- name: SoftDeleteTransaction :one
+-- name: SoftDeleteExpense :one
 UPDATE transactions
 SET
     is_deleted = true,
     deleted_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
+  AND transaction_type = 'expenditure'
   AND is_deleted = false
     RETURNING *;
 
--- name: RestoreTransaction :one
-UPDATE transactions
-SET
-    is_deleted = false,
-    deleted_at = NULL,
-    updated_at = NOW()
-WHERE id = $1
-  AND is_deleted = true
-    RETURNING *;
+
 
 -- ==================== SEARCH BY DATE RANGE ====================
 -- name: ListTransactionsByDateRange :many

@@ -2,17 +2,13 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/labstack/echo/v4"
+	"github.com/satriaardiperdana-2020/launlog-be/internal/api"
 	"github.com/satriaardiperdana-2020/launlog-be/internal/helper"
+	"github.com/satriaardiperdana-2020/launlog-be/internal/repository/postgresql"
 	"log"
 	"net/http"
-	"time"
-
-	"github.com/labstack/echo/v4"
-
-	"github.com/satriaardiperdana-2020/launlog-be/internal/api"
-	"github.com/satriaardiperdana-2020/launlog-be/internal/repository/postgresql"
 )
 
 type ExpenseHandler struct {
@@ -157,10 +153,18 @@ func (h *ExpenseHandler) CreateExpense(ctx context.Context, req api.CreateExpens
 
 func (h *ExpenseHandler) ListExpenses(ctx context.Context, req api.ListExpensesRequestObject) (api.ListExpensesResponseObject, error) {
 	log.Println("🔵 ListExpenses called")
+	startDate := pgtype.Date{}
+	if req.Params.StartDate != nil {
+		startDate.Scan(*req.Params.StartDate)
+	}
 
+	endDate := pgtype.Date{}
+	if req.Params.EndDate != nil {
+		endDate.Scan(*req.Params.EndDate)
+	}
 	expenses, err := h.Queries.ListExpenses(ctx, postgresql.ListExpensesParams{
-		StartDate: nil,
-		EndDate:   nil,
+		StartDate: startDate,
+		EndDate:   endDate,
 	})
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -172,13 +176,18 @@ func (h *ExpenseHandler) ListExpenses(ctx context.Context, req api.ListExpensesR
 		if e.Notes.Valid {
 			notes = e.Notes.String
 		}
+		// Konversi tipe data
+		idInt := int(e.ID)
+		userIdInt := int(e.UserID)
+		totalAmount := helper.NumericToFloat32(e.TotalAmount)
+		paidAmount := helper.NumericToFloat32(e.PaidAmount)
 		resp[i] = api.Transaction{
-			Id:              &e.ID,
+			Id:              &idInt,
 			InvoiceNo:       &e.InvoiceNo,
-			UserId:          &e.UserID,
+			UserId:          &userIdInt,
 			PaymentStatus:   &e.PaymentStatus,
-			TotalAmount:     &e.TotalAmount,
-			PaidAmount:      &e.PaidAmount,
+			TotalAmount:     &totalAmount,
+			PaidAmount:      &paidAmount,
 			Notes:           &notes,
 			TransactionDate: &e.TransactionDate,
 		}
@@ -190,51 +199,135 @@ func (h *ExpenseHandler) ListExpenses(ctx context.Context, req api.ListExpensesR
 func (h *ExpenseHandler) UpdateExpense(ctx context.Context, req api.UpdateExpenseRequestObject) (api.UpdateExpenseResponseObject, error) {
 	log.Printf("🔵 UpdateExpense called for ID: %d", req.Id)
 
-	existing, err := h.Queries.GetExpenseById(ctx, req.Id)
+	// ==================== CHECK IF EXPENSE EXISTS ====================
+	_, err := h.Queries.GetExpenseById(ctx, int64(req.Id))
 	if err != nil {
 		msg := "Expense not found"
 		return api.UpdateExpense404JSONResponse{Message: &msg}, nil
 	}
 
-	updated, err := h.Queries.UpdateExpense(ctx, db.UpdateExpenseParams{
-		ID:              req.Id,
-		Supplier:        req.Body.Supplier,
-		ExpenseCategory: req.Body.ExpenseCategory,
-		TotalAmount:     req.Body.TotalAmount,
-		PaidAmount:      req.Body.TotalAmount, // expense always paid
-		Notes:           req.Body.Notes,
+	// ==================== KONVERSI KE pgtype ====================
+	// Supplier (*string -> pgtype.Text)
+	supplier := pgtype.Text{}
+	if req.Body.Supplier != nil {
+		supplier.String = *req.Body.Supplier
+		supplier.Valid = true
+	}
+
+	// ExpenseCategory (*string -> pgtype.Text)
+	expenseCategory := pgtype.Text{}
+	if req.Body.ExpenseCategory != nil {
+		expenseCategory.String = *req.Body.ExpenseCategory
+		expenseCategory.Valid = true
+	}
+
+	// TotalAmount (*float64 -> pgtype.Numeric)
+	totalAmount := pgtype.Numeric{}
+	if req.Body.TotalAmount != nil {
+		if err := totalAmount.Scan(*req.Body.TotalAmount); err != nil {
+			msg := "Invalid total amount format"
+			return api.UpdateExpense400JSONResponse{Message: &msg}, nil
+		}
+	}
+
+	// PaidAmount (*float64 -> pgtype.Numeric)
+	paidAmount := pgtype.Numeric{}
+	if req.Body.PaidAmount != nil {
+		if err := paidAmount.Scan(*req.Body.PaidAmount); err != nil {
+			msg := "Invalid paid amount format"
+			return api.UpdateExpense400JSONResponse{Message: &msg}, nil
+		}
+	} else if req.Body.TotalAmount != nil {
+		// Jika paidAmount tidak dikirim, default ke totalAmount
+		paidAmount.Scan(*req.Body.TotalAmount)
+	}
+
+	// Notes (*string -> pgtype.Text)
+	notes := pgtype.Text{}
+	if req.Body.Notes != nil {
+		notes.String = *req.Body.Notes
+		notes.Valid = true
+	}
+
+	// ==================== UPDATE EXPENSE ====================
+	updated, err := h.Queries.UpdateExpense(ctx, postgresql.UpdateExpenseParams{
+		ID:              int64(req.Id),
+		Supplier:        supplier,
+		ExpenseCategory: expenseCategory,
+		TotalAmount:     totalAmount,
+		PaidAmount:      paidAmount,
+		Notes:           notes,
 	})
 	if err != nil {
 		msg := "Failed to update expense: " + err.Error()
 		return api.UpdateExpense400JSONResponse{Message: &msg}, nil
 	}
 
+	// ==================== UPDATE ITEMS ====================
 	if req.Body.Items != nil {
 		for _, item := range *req.Body.Items {
-			if item.Id != nil {
-				h.Queries.UpdateExpenseItem(ctx, db.UpdateExpenseItemParams{
-					ID:        *item.Id,
-					ItemName:  item.ItemName,
-					Qty:       item.Qty,
-					UnitPrice: item.UnitPrice,
-					Notes:     item.Notes,
-				})
+			if item.Id == nil {
+				continue
+			}
+
+			// Konversi ItemName (*string -> pgtype.Text)
+			itemName := pgtype.Text{}
+			if item.ItemName != nil {
+				itemName.String = *item.ItemName
+				itemName.Valid = true
+			}
+
+			// Konversi Qty (float64 -> pgtype.Numeric)
+			qty := pgtype.Numeric{}
+			if err := qty.Scan(item.Qty); err != nil {
+				log.Printf("Warning: Failed to convert qty: %v", err)
+			}
+
+			// Konversi UnitPrice (float64 -> pgtype.Numeric)
+			unitPrice := pgtype.Numeric{}
+			if err := unitPrice.Scan(item.UnitPrice); err != nil {
+				log.Printf("Warning: Failed to convert unit price: %v", err)
+			}
+
+			// Konversi Notes (*string -> pgtype.Text)
+			itemNotes := pgtype.Text{}
+			if item.Notes != nil {
+				itemNotes.String = *item.Notes
+				itemNotes.Valid = true
+			}
+
+			_, err := h.Queries.UpdateExpenseItem(ctx, postgresql.UpdateExpenseItemParams{
+				ID:        int64(*item.Id),
+				ItemName:  itemName,
+				Qty:       qty,
+				UnitPrice: unitPrice,
+				Notes:     itemNotes,
+			})
+			if err != nil {
+				log.Printf("Warning: Failed to update expense item %d: %v", *item.Id, err)
 			}
 		}
 	}
 
-	notes := ""
+	// ==================== RESPONSE ====================
+	respNotes := ""
 	if updated.Notes.Valid {
-		notes = updated.Notes.String
+		respNotes = updated.Notes.String
 	}
+
+	idInt := int(updated.ID)
+	userIdInt := int(updated.UserID)
+	totalAmountResp := helper.NumericToFloat32(updated.TotalAmount)
+	paidAmountResp := helper.NumericToFloat32(updated.PaidAmount)
+
 	resp := api.Transaction{
-		Id:              &updated.ID,
+		Id:              &idInt,
 		InvoiceNo:       &updated.InvoiceNo,
-		UserId:          &updated.UserID,
+		UserId:          &userIdInt,
 		PaymentStatus:   &updated.PaymentStatus,
-		TotalAmount:     &updated.TotalAmount,
-		PaidAmount:      &updated.PaidAmount,
-		Notes:           &notes,
+		TotalAmount:     &totalAmountResp,
+		PaidAmount:      &paidAmountResp,
+		Notes:           &respNotes,
 		TransactionDate: &updated.TransactionDate,
 	}
 	return api.UpdateExpense200JSONResponse(resp), nil
@@ -244,21 +337,33 @@ func (h *ExpenseHandler) UpdateExpense(ctx context.Context, req api.UpdateExpens
 func (h *ExpenseHandler) SoftDeleteExpense(ctx context.Context, req api.SoftDeleteExpenseRequestObject) (api.SoftDeleteExpenseResponseObject, error) {
 	log.Printf("🔵 SoftDeleteExpense called for ID: %d", req.Id)
 
-	deleted, err := h.Queries.SoftDeleteTransaction(ctx, req.Id)
+	// Call database query
+	deleted, err := h.Queries.SoftDeleteExpense(ctx, int64(req.Id))
 	if err != nil {
 		msg := "Expense not found or already deleted"
-		return api.SoftDeleteExpense404JSONResponse{Message: &msg}, nil
+		return api.SoftDeleteExpense404JSONResponse{Message: &msg}, nil // ✅ sekarang tersedia
 	}
 
+	log.Printf("✅ Expense %d soft deleted successfully", req.Id)
+
+	// Convert response
 	notes := ""
 	if deleted.Notes.Valid {
 		notes = deleted.Notes.String
 	}
+
+	idInt := int(deleted.ID)
+	userIdInt := int(deleted.UserID)
+	totalAmount := helper.NumericToFloat32(deleted.TotalAmount)
+	paidAmount := helper.NumericToFloat32(deleted.PaidAmount)
+
 	resp := api.Transaction{
-		Id:              &deleted.ID,
+		Id:              &idInt,
 		InvoiceNo:       &deleted.InvoiceNo,
-		UserId:          &deleted.UserID,
-		TotalAmount:     &deleted.TotalAmount,
+		UserId:          &userIdInt,
+		PaymentStatus:   &deleted.PaymentStatus,
+		TotalAmount:     &totalAmount,
+		PaidAmount:      &paidAmount,
 		Notes:           &notes,
 		TransactionDate: &deleted.TransactionDate,
 	}

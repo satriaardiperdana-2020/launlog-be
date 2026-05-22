@@ -46,12 +46,10 @@ type Querier interface {
 	ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]Transaction, error)
 	// ==================== SEARCH BY DATE RANGE ====================
 	ListTransactionsByDateRange(ctx context.Context, arg ListTransactionsByDateRangeParams) ([]Transaction, error)
-	RestoreTransaction(ctx context.Context, id int64) (Transaction, error)
 	SoftDeleteCustomer(ctx context.Context, id int64) (Customer, error)
+	SoftDeleteExpense(ctx context.Context, id int64) (Transaction, error)
 	SoftDeleteService(ctx context.Context, id int64) (Service, error)
 	SoftDeleteServiceCategory(ctx context.Context, id int64) (ServiceCategory, error)
-	// ==================== SOFT DELETE Transaction====================
-	SoftDeleteTransaction(ctx context.Context, id int64) (Transaction, error)
 	UpdateCustomer(ctx context.Context, arg UpdateCustomerParams) (Customer, error)
 	// ==================== UPDATE EXPENSE ====================
 	UpdateExpense(ctx context.Context, arg UpdateExpenseParams) (Transaction, error)

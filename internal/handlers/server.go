@@ -157,9 +157,9 @@ func (s *LaunlogServer) UpdateTransaction(ctx context.Context, req api.UpdateTra
 	return s.TransactionHandler.UpdateTransaction(ctx, req)
 }
 
-func (s *LaunlogServer) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
+/*func (s *LaunlogServer) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
 	return s.TransactionHandler.SoftDeleteTransaction(ctx, req)
-}
+}*/
 
 func (s *LaunlogServer) RestoreTransaction(ctx context.Context, req api.RestoreTransactionRequestObject) (api.RestoreTransactionResponseObject, error) {
 	return s.TransactionHandler.RestoreTransaction(ctx, req)

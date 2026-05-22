@@ -1677,12 +1677,32 @@ func (response SoftDeleteExpense200JSONResponse) VisitSoftDeleteExpenseResponse(
 	return err
 }
 
-type SoftDeleteExpense404Response struct {
+type SoftDeleteExpense401JSONResponse ErrorResponse
+
+func (response SoftDeleteExpense401JSONResponse) VisitSoftDeleteExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response SoftDeleteExpense404Response) VisitSoftDeleteExpenseResponse(w http.ResponseWriter) error {
+type SoftDeleteExpense404JSONResponse ErrorResponse
+
+func (response SoftDeleteExpense404JSONResponse) VisitSoftDeleteExpenseResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetExpenseRequestObject struct {
@@ -3689,19 +3709,19 @@ var swaggerSpec = []string{
 	"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",
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

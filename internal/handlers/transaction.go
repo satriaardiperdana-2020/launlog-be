@@ -337,8 +337,8 @@ func (h *TransactionHandler) UpdateTransaction(ctx context.Context, req api.Upda
 	return api.UpdateTransaction200JSONResponse(resp), nil
 }
 
-// SoftDeleteTransaction soft deletes a transaction
-func (h *TransactionHandler) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
+// SoftDeleteTransaction soft deletes a transaction -- GANTI SOFTDELETE TRANSACTION INCOME
+/*func (h *TransactionHandler) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
 	log.Printf("🔵 SoftDeleteTransaction called for ID: %d", req.Id)
 
 	deleted, err := h.Queries.SoftDeleteTransaction(ctx, int64(req.Id))
@@ -374,7 +374,7 @@ func (h *TransactionHandler) SoftDeleteTransaction(ctx context.Context, req api.
 		TransactionDate: &deleted.TransactionDate,
 	}
 	return api.SoftDeleteTransaction200JSONResponse(resp), nil
-}
+}*/
 
 // RestoreTransaction restores a soft deleted transaction
 func (h *TransactionHandler) RestoreTransaction(ctx context.Context, req api.RestoreTransactionRequestObject) (api.RestoreTransactionResponseObject, error) {

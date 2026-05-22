@@ -877,16 +877,17 @@ SELECT id, invoice_no, transaction_type, user_id, customer_id, payment_method_id
 WHERE transaction_type = 'expenditure'
   AND ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
   AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
+  AND is_deleted = false
 ORDER BY transaction_date DESC
 `
 
 type ListExpensesParams struct {
-	Column1 pgtype.Date `json:"column_1"`
-	Column2 pgtype.Date `json:"column_2"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
 }
 
 func (q *Queries) ListExpenses(ctx context.Context, arg ListExpensesParams) ([]Transaction, error) {
-	rows, err := q.db.Query(ctx, listExpenses, arg.Column1, arg.Column2)
+	rows, err := q.db.Query(ctx, listExpenses, arg.StartDate, arg.EndDate)
 	if err != nil {
 		return nil, err
 	}
@@ -1051,13 +1052,13 @@ ORDER BY transaction_date DESC
 `
 
 type ListTransactionsParams struct {
-	StartDate       pgtype.Date `json:"start_date"`
-	EndDate         pgtype.Date `json:"end_date"`
-	TransactionType string      `json:"transaction_type"`
+	Column1 pgtype.Date `json:"column_1"`
+	Column2 pgtype.Date `json:"column_2"`
+	Column3 string      `json:"column_3"`
 }
 
 func (q *Queries) ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]Transaction, error) {
-	rows, err := q.db.Query(ctx, listTransactions, arg.StartDate, arg.EndDate, arg.TransactionType)
+	rows, err := q.db.Query(ctx, listTransactions, arg.Column1, arg.Column2, arg.Column3)
 	if err != nil {
 		return nil, err
 	}
@@ -1150,43 +1151,6 @@ func (q *Queries) ListTransactionsByDateRange(ctx context.Context, arg ListTrans
 	return items, nil
 }
 
-const restoreTransaction = `-- name: RestoreTransaction :one
-UPDATE transactions
-SET
-    is_deleted = false,
-    deleted_at = NULL,
-    updated_at = NOW()
-WHERE id = $1
-  AND is_deleted = true
-    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
-`
-
-func (q *Queries) RestoreTransaction(ctx context.Context, id int64) (Transaction, error) {
-	row := q.db.QueryRow(ctx, restoreTransaction, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.InvoiceNo,
-		&i.TransactionType,
-		&i.UserID,
-		&i.CustomerID,
-		&i.PaymentMethodID,
-		&i.PaymentStatus,
-		&i.IsDelivery,
-		&i.Supplier,
-		&i.ExpenseCategory,
-		&i.TotalAmount,
-		&i.PaidAmount,
-		&i.Notes,
-		&i.TransactionDate,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsDeleted,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
 const softDeleteCustomer = `-- name: SoftDeleteCustomer :one
 UPDATE customers
 SET
@@ -1207,6 +1171,44 @@ func (q *Queries) SoftDeleteCustomer(ctx context.Context, id int64) (Customer, e
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const softDeleteExpense = `-- name: SoftDeleteExpense :one
+UPDATE transactions
+SET
+    is_deleted = true,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+  AND transaction_type = 'expenditure'
+  AND is_deleted = false
+    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
+`
+
+func (q *Queries) SoftDeleteExpense(ctx context.Context, id int64) (Transaction, error) {
+	row := q.db.QueryRow(ctx, softDeleteExpense, id)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.InvoiceNo,
+		&i.TransactionType,
+		&i.UserID,
+		&i.CustomerID,
+		&i.PaymentMethodID,
+		&i.PaymentStatus,
+		&i.IsDelivery,
+		&i.Supplier,
+		&i.ExpenseCategory,
+		&i.TotalAmount,
+		&i.PaidAmount,
+		&i.Notes,
+		&i.TransactionDate,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -1256,44 +1258,6 @@ func (q *Queries) SoftDeleteServiceCategory(ctx context.Context, id int64) (Serv
 		&i.SortOrder,
 		&i.UpdatedAt,
 		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const softDeleteTransaction = `-- name: SoftDeleteTransaction :one
-UPDATE transactions
-SET
-    is_deleted = true,
-    deleted_at = NOW(),
-    updated_at = NOW()
-WHERE id = $1
-  AND is_deleted = false
-    RETURNING id, invoice_no, transaction_type, user_id, customer_id, payment_method_id, payment_status, is_delivery, supplier, expense_category, total_amount, paid_amount, notes, transaction_date, created_at, updated_at, is_deleted, deleted_at
-`
-
-// ==================== SOFT DELETE Transaction====================
-func (q *Queries) SoftDeleteTransaction(ctx context.Context, id int64) (Transaction, error) {
-	row := q.db.QueryRow(ctx, softDeleteTransaction, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.InvoiceNo,
-		&i.TransactionType,
-		&i.UserID,
-		&i.CustomerID,
-		&i.PaymentMethodID,
-		&i.PaymentStatus,
-		&i.IsDelivery,
-		&i.Supplier,
-		&i.ExpenseCategory,
-		&i.TotalAmount,
-		&i.PaidAmount,
-		&i.Notes,
-		&i.TransactionDate,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsDeleted,
-		&i.DeletedAt,
 	)
 	return i, err
 }
