@@ -369,3 +369,39 @@ func (h *ExpenseHandler) SoftDeleteExpense(ctx context.Context, req api.SoftDele
 	}
 	return api.SoftDeleteExpense200JSONResponse(resp), nil
 }
+
+// GetExpense returns expense by ID
+func (h *ExpenseHandler) GetExpense(ctx context.Context, req api.GetExpenseRequestObject) (api.GetExpenseResponseObject, error) {
+	log.Printf("🔵 GetExpense called for ID: %d", req.Id)
+
+	// ==================== GET EXPENSE FROM DATABASE ====================
+	expense, err := h.Queries.GetExpenseById(ctx, int64(req.Id))
+	if err != nil {
+		msg := "Expense not found"
+		return api.GetExpense404JSONResponse{Message: &msg}, nil
+	}
+
+	// ==================== RESPONSE ====================
+	notes := ""
+	if expense.Notes.Valid {
+		notes = expense.Notes.String
+	}
+
+	// Konversi tipe data untuk response
+	idInt := int(expense.ID)
+	userIdInt := int(expense.UserID)
+	totalAmount := helper.NumericToFloat32(expense.TotalAmount)
+	paidAmount := helper.NumericToFloat32(expense.PaidAmount)
+
+	resp := api.Transaction{
+		Id:              &idInt,
+		InvoiceNo:       &expense.InvoiceNo,
+		UserId:          &userIdInt,
+		PaymentStatus:   &expense.PaymentStatus,
+		TotalAmount:     &totalAmount,
+		PaidAmount:      &paidAmount,
+		Notes:           &notes,
+		TransactionDate: &expense.TransactionDate,
+	}
+	return api.GetExpense200JSONResponse(resp), nil
+}

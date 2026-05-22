@@ -218,10 +218,20 @@ WHERE t.id = $1;
 
 -- name: ListTransactions :many
 SELECT * FROM transactions
-WHERE ($1::date IS NULL OR DATE(transaction_date) >= $1::date)
-  AND ($2::date IS NULL OR DATE(transaction_date) <= $2::date)
-  AND ($3::text IS NULL OR transaction_type = $3::text)
+WHERE (sqlc.arg('start_date')::date IS NULL OR DATE(transaction_date) >= sqlc.arg('start_date')::date)
+  AND (sqlc.arg('end_date')::date IS NULL OR DATE(transaction_date) <= sqlc.arg('end_date')::date)
+  AND (sqlc.arg('transaction_type')::text IS NULL OR transaction_type = sqlc.arg('transaction_type')::text)
 ORDER BY transaction_date DESC;
+
+-- name: RestoreTransaction :one
+UPDATE transactions
+SET
+    is_deleted = false,
+    deleted_at = NULL,
+    updated_at = NOW()
+WHERE id = $1
+  AND is_deleted = true
+    RETURNING *;
 
 -- ==================== EXPENSE ====================
 
@@ -253,6 +263,7 @@ SELECT * FROM transactions
 WHERE id = $1 AND transaction_type = 'expenditure';
 
 -- update and sofdelete expense income
+
 -- ==================== UPDATE INCOME ====================
 -- name: UpdateIncome :one
 UPDATE transactions
@@ -276,7 +287,16 @@ SET
     notes = COALESCE(sqlc.narg('notes')::text, notes)
 WHERE id = sqlc.arg('id')
     RETURNING *;
-
+-- SOFTDELETE INCOME
+-- name: SoftDeleteTransaction :one
+UPDATE transactions
+SET
+    is_deleted = true,
+    deleted_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+  AND is_deleted = false
+    RETURNING *;
 -- ==================== UPDATE EXPENSE ====================
 -- name: UpdateExpense :one
 UPDATE transactions

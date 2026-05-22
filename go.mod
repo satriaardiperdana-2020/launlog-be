@@ -9,9 +9,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/labstack/gommon v0.5.0
-	github.com/oapi-codegen/nullable v1.1.0
 	github.com/oapi-codegen/runtime v1.4.0
-	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/crypto v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
 )

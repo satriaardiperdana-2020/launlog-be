@@ -6,8 +6,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"log"
+	"math/big"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -24,71 +24,106 @@ type TransactionHandler struct {
 func (h *TransactionHandler) CreateTransaction(ctx context.Context, req api.CreateTransactionRequestObject) (api.CreateTransactionResponseObject, error) {
 	log.Println("🔵 CreateTransaction called")
 
-	// Validation
+	// ==================== VALIDATION ====================
+	// ✅ UserId adalah int (bukan pointer), langsung cek nilai
 	if req.Body.UserId <= 0 {
-		msg := "User ID is required"
+		msg := "User ID is required and must be greater than 0"
 		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
 	}
+
+	// ✅ CustomerId adalah *int (pointer)
 	if req.Body.CustomerId == nil {
 		msg := "Customer ID is required"
 		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
 	}
+	if *req.Body.CustomerId <= 0 {
+		msg := "Customer ID must be greater than 0"
+		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
+	}
+
+	// ✅ Items
 	if req.Body.Items == nil || len(req.Body.Items) == 0 {
 		msg := "At least one item is required"
 		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
 	}
 
-	// Calculate total
+	// ==================== CALCULATE TOTAL ====================
 	var totalAmount float64
 	for _, item := range req.Body.Items {
 		if item.ServiceId == nil {
 			msg := "Service ID is required for each item"
 			return api.CreateTransaction400JSONResponse{Message: &msg}, nil
 		}
+		if item.Qty == nil || *item.Qty <= 0 {
+			msg := "Quantity must be greater than 0 for each item"
+			return api.CreateTransaction400JSONResponse{Message: &msg}, nil
+		}
+
 		// Konversi *int ke int64
 		serviceID := int64(*item.ServiceId)
 
+		// ✅ Gunakan GetServiceByID (bukan GetServiceById)
 		service, err := h.Queries.GetServiceById(ctx, serviceID)
 		if err != nil {
-			msg := fmt.Sprintf("Service ID %d not found", item.ServiceId)
+			msg := fmt.Sprintf("Service ID %d not found", serviceID)
+			log.Printf("❌ Service not found: %v", err)
 			return api.CreateTransaction400JSONResponse{Message: &msg}, nil
 		}
-		price := helper.NumericToFloat64(service.Price)
-		totalAmount += price * float64(*item.Qty)
-		log.Println("Show total Amount :  ", totalAmount)
-	}
 
-	// Generate invoice
-	invoiceNo := fmt.Sprintf("INV-%s-%d", time.Now().Format("200601"), time.Now().UnixNano()%1000)
+		price := helper.NumericToFloat64(service.Price)
+		qty := float64(*item.Qty)
+		totalAmount += price * qty
+	}
+	log.Printf("💰 Total Amount: %.2f", totalAmount)
+
+	// ==================== GENERATE INVOICE ====================
+	invoiceNo := helper.GenerateInvoiceNo("INV")
+	log.Printf("📄 Invoice No: %s", invoiceNo)
 
 	isDelivery := false
 	if req.Body.IsDelivery != nil {
 		isDelivery = *req.Body.IsDelivery
 	}
 
-	// ✅ Konversi CustomerId ke pgtype.Int8 (nullable)
+	// ==================== KONVERSI KE pgtype ====================
+	// ✅ UserId (int -> int64)
+	userID := int64(req.Body.UserId)
+
+	// ✅ CustomerId (*int -> pgtype.Int8)
 	customerID := pgtype.Int8{}
 	if req.Body.CustomerId != nil {
 		customerID.Int64 = int64(*req.Body.CustomerId)
 		customerID.Valid = true
 	}
 
-	// ✅ Konversi Notes ke pgtype.Text
+	// ✅ Konversi totalAmount ke pgtype.Numeric (dengan validasi)
+	totalAmountNumeric := pgtype.Numeric{}
+	// Cara paling aman: konversi ke string terlebih dahulu
+	amountStr := fmt.Sprintf("%.2f", totalAmount)
+	if err := totalAmountNumeric.Scan(amountStr); err != nil {
+		log.Printf("⚠️ String scan failed: %v", err)
+		msg := "Failed to convert total amount"
+		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
+	}
+
+	// ✅ Pastikan Valid = true
+	if !totalAmountNumeric.Valid {
+		log.Printf("❌ TotalAmountNumeric is not valid!")
+		msg := "Failed to convert total amount"
+		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
+	}
+
+	// ✅ Notes (*string -> pgtype.Text)
 	notes := pgtype.Text{}
 	if req.Body.Notes != nil {
 		notes.String = *req.Body.Notes
 		notes.Valid = true
 	}
-	// ✅ Konversi TotalAmount ke pgtype.Numeric
-	totalAmountNumeric := pgtype.Numeric{}
-	if err := totalAmountNumeric.Scan(totalAmount); err != nil {
-		msg := "Failed to convert total amount"
-		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
-	}
-	// Create transaction
+
+	// ==================== CREATE TRANSACTION ====================
 	transaction, err := h.Queries.CreateTransaction(ctx, postgresql.CreateTransactionParams{
 		InvoiceNo:   invoiceNo,
-		UserID:      int64(req.Body.UserId),
+		UserID:      userID,
 		CustomerID:  customerID,
 		IsDelivery:  isDelivery,
 		TotalAmount: totalAmountNumeric,
@@ -96,8 +131,11 @@ func (h *TransactionHandler) CreateTransaction(ctx context.Context, req api.Crea
 	})
 	if err != nil {
 		msg := "Failed to create transaction: " + err.Error()
+		log.Printf("❌ Database error: %v", err)
 		return api.CreateTransaction400JSONResponse{Message: &msg}, nil
 	}
+
+	log.Printf("✅ Transaction created with ID: %d", transaction.ID)
 
 	// ==================== CREATE ITEMS ====================
 	for _, item := range req.Body.Items {
@@ -112,18 +150,32 @@ func (h *TransactionHandler) CreateTransaction(ctx context.Context, req api.Crea
 			serviceID.Valid = true
 		}
 
-		// ✅ Qty ke pgtype.Numeric (bukan float64)
-		qtyNumeric := pgtype.Numeric{}
-		if item.Qty != nil {
-			qtyNumeric.Scan(float64(*item.Qty))
+		// ✅ Qty ke pgtype.Numeric
+		qtyValue := float64(*item.Qty)
+		log.Printf("📦 Raw Qty value: %f", qtyValue)
+		qtyNumeric := helper.Float64ToNumeric(qtyValue)
+		qtyStr := fmt.Sprintf("%.2f", qtyValue)
+		log.Printf("📦 Qty string: %s", qtyStr)
+
+		if err := qtyNumeric.Scan(qtyStr); err != nil {
+			log.Printf("⚠️ Qty scan failed: %v", err)
+			// Fallback: manual conversion
+			intVal := int64(qtyValue * 100)
+			qtyNumeric.Int = big.NewInt(intVal)
+			qtyNumeric.Exp = -2
+			qtyNumeric.Valid = true
 		}
 
-		// Notes ke pgtype.Text
+		log.Printf("📦 Qty Numeric - Valid: %v, Int: %v, Exp: %v",
+			qtyNumeric.Valid, qtyNumeric.Int, qtyNumeric.Exp)
+
+		// ✅ Notes ke pgtype.Text
 		itemNotes := pgtype.Text{}
 		if item.Notes != nil {
 			itemNotes.String = *item.Notes
 			itemNotes.Valid = true
 		}
+
 		_, err := h.Queries.CreateTransactionItem(ctx, postgresql.CreateTransactionItemParams{
 			TransactionID: transaction.ID,
 			ServiceID:     serviceID,
@@ -140,14 +192,27 @@ func (h *TransactionHandler) CreateTransaction(ctx context.Context, req api.Crea
 	if transaction.Notes.Valid {
 		respNotes = transaction.Notes.String
 	}
-	totalAmountFloat32 := helper.NumericToFloat32(transaction.TotalAmount)
+
+	// Konversi untuk response
+	idInt := int(transaction.ID)
+	userIdInt := int(transaction.UserID)
+
+	customerId := 0
+	if transaction.CustomerID.Valid {
+		customerId = int(transaction.CustomerID.Int64)
+	}
+
+	totalAmountResp := helper.NumericToFloat32(transaction.TotalAmount)
+	paidAmountResp := helper.NumericToFloat32(transaction.PaidAmount)
+
 	resp := api.Transaction{
-		Id:              helper.Int64ToIntPtr(transaction.ID),
+		Id:              &idInt,
 		InvoiceNo:       &transaction.InvoiceNo,
-		UserId:          helper.Int64ToIntPtr(transaction.UserID),
-		CustomerId:      helper.PgInt8ToIntPtr(transaction.CustomerID),
+		UserId:          &userIdInt,
+		CustomerId:      &customerId,
 		PaymentStatus:   &transaction.PaymentStatus,
-		TotalAmount:     &totalAmountFloat32,
+		TotalAmount:     &totalAmountResp,
+		PaidAmount:      &paidAmountResp,
 		Notes:           &respNotes,
 		TransactionDate: &transaction.TransactionDate,
 	}
@@ -338,7 +403,7 @@ func (h *TransactionHandler) UpdateTransaction(ctx context.Context, req api.Upda
 }
 
 // SoftDeleteTransaction soft deletes a transaction -- GANTI SOFTDELETE TRANSACTION INCOME
-/*func (h *TransactionHandler) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
+func (h *TransactionHandler) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
 	log.Printf("🔵 SoftDeleteTransaction called for ID: %d", req.Id)
 
 	deleted, err := h.Queries.SoftDeleteTransaction(ctx, int64(req.Id))
@@ -374,7 +439,7 @@ func (h *TransactionHandler) UpdateTransaction(ctx context.Context, req api.Upda
 		TransactionDate: &deleted.TransactionDate,
 	}
 	return api.SoftDeleteTransaction200JSONResponse(resp), nil
-}*/
+}
 
 // RestoreTransaction restores a soft deleted transaction
 func (h *TransactionHandler) RestoreTransaction(ctx context.Context, req api.RestoreTransactionRequestObject) (api.RestoreTransactionResponseObject, error) {

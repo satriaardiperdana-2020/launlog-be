@@ -707,7 +707,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateExpenseJSONRequestBody'
+              $ref: '#/components/schemas/ExpenseRequestBody'
       responses:
         '201':
           description: Created
@@ -1061,7 +1061,7 @@ components:
 
 
     # ==================== EXPENSES ====================
-    CreateExpenseJSONRequestBody:
+    ExpenseRequestBody:
       type: object
       required:
         - userId

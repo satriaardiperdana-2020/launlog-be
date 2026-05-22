@@ -121,6 +121,19 @@ func (s *LaunlogServer) ListExpenses(ctx context.Context, req api.ListExpensesRe
 	return s.ExpenseHandler.ListExpenses(ctx, req)
 }
 
+func (s *LaunlogServer) UpdateExpense(ctx context.Context, req api.UpdateExpenseRequestObject) (api.UpdateExpenseResponseObject, error) {
+	return s.ExpenseHandler.UpdateExpense(ctx, req)
+}
+
+func (s *LaunlogServer) SoftDeleteExpense(ctx context.Context, req api.SoftDeleteExpenseRequestObject) (api.SoftDeleteExpenseResponseObject, error) {
+	return s.ExpenseHandler.SoftDeleteExpense(ctx, req)
+}
+
+// GetExpense returns expense by ID
+func (s *LaunlogServer) GetExpense(ctx context.Context, req api.GetExpenseRequestObject) (api.GetExpenseResponseObject, error) {
+	return s.ExpenseHandler.GetExpense(ctx, req)
+}
+
 // ---------- Dashboard & Reports ----------
 func (s *LaunlogServer) GetDashboard(ctx context.Context, req api.GetDashboardRequestObject) (api.GetDashboardResponseObject, error) {
 	// Stub: return zero dashboard (200)
@@ -157,9 +170,9 @@ func (s *LaunlogServer) UpdateTransaction(ctx context.Context, req api.UpdateTra
 	return s.TransactionHandler.UpdateTransaction(ctx, req)
 }
 
-/*func (s *LaunlogServer) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
+func (s *LaunlogServer) SoftDeleteTransaction(ctx context.Context, req api.SoftDeleteTransactionRequestObject) (api.SoftDeleteTransactionResponseObject, error) {
 	return s.TransactionHandler.SoftDeleteTransaction(ctx, req)
-}*/
+}
 
 func (s *LaunlogServer) RestoreTransaction(ctx context.Context, req api.RestoreTransactionRequestObject) (api.RestoreTransactionResponseObject, error) {
 	return s.TransactionHandler.RestoreTransaction(ctx, req)
@@ -167,12 +180,4 @@ func (s *LaunlogServer) RestoreTransaction(ctx context.Context, req api.RestoreT
 
 func (s *LaunlogServer) GetTransactionReport(ctx context.Context, req api.GetTransactionReportRequestObject) (api.GetTransactionReportResponseObject, error) {
 	return s.TransactionHandler.GetTransactionReport(ctx, req)
-}
-
-func (s *LaunlogServer) UpdateExpense(ctx context.Context, req api.UpdateExpenseRequestObject) (api.UpdateExpenseResponseObject, error) {
-	return s.ExpenseHandler.UpdateExpense(ctx, req)
-}
-
-func (s *LaunlogServer) SoftDeleteExpense(ctx context.Context, req api.SoftDeleteExpenseRequestObject) (api.SoftDeleteExpenseResponseObject, error) {
-	return s.ExpenseHandler.SoftDeleteExpense(ctx, req)
 }
